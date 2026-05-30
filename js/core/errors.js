@@ -5,7 +5,14 @@ export class ApiDiagnosticError extends Error {
     this.kind = kind;
     this.userMessage = userMessage;
 
-    const { payload: _payload, ...safeDetail } = detail;
+    const safeDetail = {};
+
+    for (const key of ["exchange", "operation", "status", "symbol"]) {
+      if (detail[key] !== undefined) {
+        safeDetail[key] = detail[key];
+      }
+    }
+
     this.detail = {
       ...safeDetail,
       occurredAt: new Date().toISOString(),

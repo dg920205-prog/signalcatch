@@ -20,7 +20,7 @@ export async function fetchJson(
     try {
       return await response.json();
     } catch {
-      throw new ApiDiagnosticError("format", "거래소 응답 형식이 올바르지 않습니다.", {
+      throw new ApiDiagnosticError("response-format", "거래소 응답 형식이 올바르지 않습니다.", {
         exchange,
         operation,
       });

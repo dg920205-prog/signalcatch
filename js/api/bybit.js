@@ -4,9 +4,32 @@ import { toUsdtSymbol } from "../core/symbols.js";
 import { fetchJson } from "./http.js";
 
 const EXCHANGE = "Bybit";
+const MAX_HISTORY_PAGES = 1000;
+const VALID_INTERVALS = new Set([
+  "1",
+  "3",
+  "5",
+  "15",
+  "30",
+  "60",
+  "120",
+  "240",
+  "360",
+  "720",
+  "D",
+  "W",
+  "M",
+]);
 
 function formatError(operation) {
-  return new ApiDiagnosticError("format", "Bybit 응답 형식이 올바르지 않습니다.", {
+  return new ApiDiagnosticError("response-format", "Bybit 응답 형식이 올바르지 않습니다.", {
+    exchange: EXCHANGE,
+    operation,
+  });
+}
+
+function inputError(operation) {
+  return new ApiDiagnosticError("input", "Bybit 요청 값이 올바르지 않습니다.", {
     exchange: EXCHANGE,
     operation,
   });
@@ -33,6 +56,14 @@ function requireBybitList(payload, operation) {
 }
 
 function toFiniteNumber(value, operation) {
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    throw formatError(operation);
+  }
+
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
@@ -40,6 +71,26 @@ function toFiniteNumber(value, operation) {
   }
 
   return number;
+}
+
+function validateCandleOptions({ interval, limit, start, end }, operation) {
+  if (!VALID_INTERVALS.has(String(interval))) {
+    throw inputError(operation);
+  }
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+    throw inputError(operation);
+  }
+
+  for (const timestamp of [start, end]) {
+    if (timestamp !== undefined && (!Number.isFinite(timestamp) || timestamp <= 0)) {
+      throw inputError(operation);
+    }
+  }
+
+  if (start !== undefined && end !== undefined && start > end) {
+    throw inputError(operation);
+  }
 }
 
 export function normalizeBybitKlines(rows) {
@@ -53,7 +104,7 @@ export function normalizeBybitKlines(rows) {
         throw formatError("캔들 조회");
       }
 
-      return {
+      const candle = {
         time: toFiniteNumber(row[0], "캔들 조회"),
         open: toFiniteNumber(row[1], "캔들 조회"),
         high: toFiniteNumber(row[2], "캔들 조회"),
@@ -61,6 +112,20 @@ export function normalizeBybitKlines(rows) {
         close: toFiniteNumber(row[4], "캔들 조회"),
         volume: toFiniteNumber(row[5], "캔들 조회"),
       };
+
+      if (
+        candle.time <= 0 ||
+        candle.open <= 0 ||
+        candle.high <= 0 ||
+        candle.low <= 0 ||
+        candle.close <= 0 ||
+        candle.volume < 0 ||
+        candle.high < candle.low
+      ) {
+        throw formatError("캔들 조회");
+      }
+
+      return candle;
     })
     .sort((left, right) => left.time - right.time);
 }
@@ -84,7 +149,7 @@ export async function fetchBybitTicker(input) {
 
   return {
     symbol,
-    price: toFiniteNumber(ticker.lastPrice, "티커 조회"),
+    price: toPositiveNumber(ticker.markPrice, "티커 조회"),
   };
 }
 
@@ -117,6 +182,8 @@ export async function fetchBybitCandles(
   input,
   { interval = "60", limit = 200, start, end } = {},
 ) {
+  validateCandleOptions({ interval, limit, start, end }, "캔들 조회");
+
   const symbol = toUsdtSymbol(input);
   const url = createUrl("/v5/market/kline", {
     category: "linear",
@@ -138,7 +205,13 @@ export async function fetchBybitHistory(
   input,
   { interval = "60", start, end = Date.now(), limit = 1000 } = {},
 ) {
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start <= 0 ||
+    end <= 0 ||
+    start >= end
+  ) {
     throw new ApiDiagnosticError("input", "조회 기간이 올바르지 않습니다.", {
       exchange: EXCHANGE,
       operation: "과거 캔들 조회",
@@ -147,8 +220,14 @@ export async function fetchBybitHistory(
 
   const candlesByTime = new Map();
   let pageEnd = end;
+  let pageCount = 0;
 
   while (pageEnd >= start) {
+    if (pageCount >= MAX_HISTORY_PAGES) {
+      throw formatError("과거 캔들 조회");
+    }
+    pageCount += 1;
+
     const page = await fetchBybitCandles(input, {
       interval,
       limit,
@@ -172,8 +251,24 @@ export async function fetchBybitHistory(
       break;
     }
 
-    pageEnd = oldestTime - 1;
+    const nextPageEnd = oldestTime - 1;
+
+    if (nextPageEnd >= pageEnd) {
+      throw formatError("과거 캔들 조회");
+    }
+
+    pageEnd = nextPageEnd;
   }
 
   return [...candlesByTime.values()].sort((left, right) => left.time - right.time);
+}
+
+function toPositiveNumber(value, operation) {
+  const number = toFiniteNumber(value, operation);
+
+  if (number <= 0) {
+    throw formatError(operation);
+  }
+
+  return number;
 }
