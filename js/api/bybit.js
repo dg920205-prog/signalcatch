@@ -56,11 +56,11 @@ function requireBybitList(payload, operation) {
 }
 
 function toFiniteNumber(value, operation) {
-  if (
-    value === null ||
-    value === undefined ||
-    (typeof value === "string" && value.trim() === "")
-  ) {
+  if (typeof value !== "number" && typeof value !== "string") {
+    throw formatError(operation);
+  }
+
+  if (typeof value === "string" && value.trim() === "") {
     throw formatError(operation);
   }
 
