@@ -7,10 +7,17 @@ export class ApiDiagnosticError extends Error {
 
     const safeDetail = {};
 
-    for (const key of ["exchange", "operation", "status", "symbol"]) {
-      if (detail[key] !== undefined) {
+    for (const key of ["exchange", "operation", "symbol"]) {
+      if (typeof detail[key] === "string") {
         safeDetail[key] = detail[key];
       }
+    }
+
+    if (
+      Number.isInteger(detail.status) ||
+      typeof detail.status === "string"
+    ) {
+      safeDetail.status = detail.status;
     }
 
     this.detail = {

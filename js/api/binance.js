@@ -87,7 +87,7 @@ function validateCandleOptions({ interval, limit, start, end }, operation) {
   }
 
   for (const timestamp of [start, end]) {
-    if (timestamp !== undefined && (!Number.isFinite(timestamp) || timestamp <= 0)) {
+    if (timestamp !== undefined && (!Number.isInteger(timestamp) || timestamp <= 0)) {
       throw inputError(operation);
     }
   }
@@ -160,13 +160,18 @@ export function normalizeBinanceKlines(payload) {
       };
 
       if (
+        !Number.isInteger(candle.time) ||
         candle.time <= 0 ||
         candle.open <= 0 ||
         candle.high <= 0 ||
         candle.low <= 0 ||
         candle.close <= 0 ||
         candle.volume < 0 ||
-        candle.high < candle.low
+        candle.high < candle.low ||
+        candle.open < candle.low ||
+        candle.open > candle.high ||
+        candle.close < candle.low ||
+        candle.close > candle.high
       ) {
         throw formatError("캔들 조회");
       }

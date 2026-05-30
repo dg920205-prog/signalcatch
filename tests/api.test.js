@@ -100,6 +100,19 @@ test("does not retain remote payloads in diagnostic details", () => {
   assert.equal(typeof error.detail.occurredAt, "string");
 });
 
+test("retains only safe scalar diagnostic detail values", () => {
+  const error = new ApiDiagnosticError("http", "request failed", {
+    exchange: { name: "Bybit" },
+    operation: ["candle lookup"],
+    status: { code: 500 },
+    symbol: ["BTCUSDT"],
+    occurredAt: "remote timestamp",
+  });
+
+  assert.deepEqual(Object.keys(error.detail), ["occurredAt"]);
+  assert.match(error.detail.occurredAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
 test("preserves rate-limit diagnostics without remote HTTP payloads", async () => {
   await withFetchStub(
     async () =>
@@ -298,6 +311,14 @@ test("rejects invalid Bybit candle semantics", () => {
     () => normalizeBybitKlines([["1000", "1", "2", "0.5", "1.5", "-1"]]),
     (error) => error.kind === "response-format",
   );
+  assert.throws(
+    () => normalizeBybitKlines([["1000.5", "1", "2", "0.5", "1.5", "8"]]),
+    (error) => error.kind === "response-format",
+  );
+  assert.throws(
+    () => normalizeBybitKlines([["1000", "3", "4", "2", "5", "8"]]),
+    (error) => error.kind === "response-format",
+  );
 });
 
 test("fetches a valid Binance ticker price", async () => {
@@ -392,6 +413,14 @@ test("rejects invalid Binance candle semantics", () => {
     () => normalizeBinanceKlines([[1000, "1", "2", "0.5", "1.5", "-1"]]),
     (error) => error.kind === "response-format",
   );
+  assert.throws(
+    () => normalizeBinanceKlines([[1000.5, "1", "2", "0.5", "1.5", "8"]]),
+    (error) => error.kind === "response-format",
+  );
+  assert.throws(
+    () => normalizeBinanceKlines([[1000, "0.25", "2", "0.5", "1.5", "8"]]),
+    (error) => error.kind === "response-format",
+  );
 });
 
 test("merges paginated Bybit history without duplicate candles", async () => {
@@ -441,6 +470,12 @@ test("rejects invalid Bybit history bounds before fetching", async () => {
         kind: "input",
       });
       await assert.rejects(fetchBybitHistory("btc", { start: 3000, end: 3000 }), {
+        kind: "input",
+      });
+      await assert.rejects(fetchBybitHistory("btc", { start: 1000.5, end: 3000 }), {
+        kind: "input",
+      });
+      await assert.rejects(fetchBybitHistory("btc", { start: 1000, end: 3000.5 }), {
         kind: "input",
       });
     },
