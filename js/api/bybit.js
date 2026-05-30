@@ -5,6 +5,7 @@ import { fetchJson } from "./http.js";
 
 const EXCHANGE = "Bybit";
 const MAX_HISTORY_PAGES = 1000;
+const DECIMAL_NUMBER = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
 const VALID_INTERVALS = new Set([
   "1",
   "3",
@@ -60,8 +61,12 @@ function toFiniteNumber(value, operation) {
     throw formatError(operation);
   }
 
-  if (typeof value === "string" && value.trim() === "") {
-    throw formatError(operation);
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+
+    if (!DECIMAL_NUMBER.test(trimmedValue)) {
+      throw formatError(operation);
+    }
   }
 
   const number = Number(value);

@@ -79,6 +79,22 @@ test("rejects coerced numeric fields in Bybit klines", () => {
   );
 });
 
+test("rejects non-decimal numeric strings in Bybit klines", () => {
+  for (const volume of ["0x10", "0b10", "0o10"]) {
+    assert.throws(
+      () => normalizeBybitKlines([["1000", "1", "2", "0.5", "1.5", volume]]),
+      (error) => error.kind === "response-format",
+    );
+  }
+});
+
+test("accepts decimal and exponent numeric strings in Bybit klines", () => {
+  assert.deepEqual(
+    normalizeBybitKlines([["1000", ".5", "2e0", "+.25", "1.5", "8"]]),
+    [{ time: 1000, open: 0.5, high: 2, low: 0.25, close: 1.5, volume: 8 }],
+  );
+});
+
 test("rejects empty or null numeric fields in Binance klines", () => {
   assert.throws(
     () => normalizeBinanceKlines([[1000, "1", "2", "", "1.5", "8"]]),
@@ -106,6 +122,22 @@ test("rejects coerced numeric fields in Binance klines", () => {
   assert.throws(
     () => normalizeBinanceKlines([[1000, "1", "2", ["0.5"], "1.5", "8"]]),
     (error) => error.kind === "response-format",
+  );
+});
+
+test("rejects non-decimal numeric strings in Binance klines", () => {
+  for (const volume of ["0x10", "0b10", "0o10"]) {
+    assert.throws(
+      () => normalizeBinanceKlines([[1000, "1", "2", "0.5", "1.5", volume]]),
+      (error) => error.kind === "response-format",
+    );
+  }
+});
+
+test("accepts decimal and exponent numeric strings in Binance klines", () => {
+  assert.deepEqual(
+    normalizeBinanceKlines([[1000, ".5", "2e0", "+.25", "1.5", "8"]]),
+    [{ time: 1000, open: 0.5, high: 2, low: 0.25, close: 1.5, volume: 8 }],
   );
 });
 
@@ -280,6 +312,26 @@ test("rejects coerced Bybit ticker mark prices", async () => {
   }
 });
 
+test("rejects non-decimal Bybit ticker mark prices", async () => {
+  for (const markPrice of ["0x10", "0b10", "0o10"]) {
+    await withFetchStub(
+      async () =>
+        new Response(
+          JSON.stringify({
+            retCode: 0,
+            result: { list: [{ symbol: "BTCUSDT", markPrice }] },
+          }),
+        ),
+      async () => {
+        await assert.rejects(
+          fetchBybitTicker("btc"),
+          (error) => error.kind === "response-format",
+        );
+      },
+    );
+  }
+});
+
 test("finds a valid Bybit symbol", async () => {
   await withFetchStub(
     async () =>
@@ -402,6 +454,20 @@ test("rejects non-positive Binance ticker prices", async () => {
 
 test("rejects coerced Binance ticker prices", async () => {
   for (const price of [true, ["123.45"]]) {
+    await withFetchStub(
+      async () => new Response(JSON.stringify({ symbol: "BTCUSDT", price })),
+      async () => {
+        await assert.rejects(
+          fetchBinanceTicker("btc"),
+          (error) => error.kind === "response-format",
+        );
+      },
+    );
+  }
+});
+
+test("rejects non-decimal Binance ticker prices", async () => {
+  for (const price of ["0x10", "0b10", "0o10"]) {
     await withFetchStub(
       async () => new Response(JSON.stringify({ symbol: "BTCUSDT", price })),
       async () => {

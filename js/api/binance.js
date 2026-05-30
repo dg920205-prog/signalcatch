@@ -4,6 +4,7 @@ import { toUsdtSymbol } from "../core/symbols.js";
 import { fetchJson } from "./http.js";
 
 const EXCHANGE = "Binance";
+const DECIMAL_NUMBER = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
 const VALID_INTERVALS = new Set([
   "1m",
   "3m",
@@ -54,8 +55,12 @@ function toFiniteNumber(value, operation) {
     throw formatError(operation);
   }
 
-  if (typeof value === "string" && value.trim() === "") {
-    throw formatError(operation);
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+
+    if (!DECIMAL_NUMBER.test(trimmedValue)) {
+      throw formatError(operation);
+    }
   }
 
   const number = Number(value);
