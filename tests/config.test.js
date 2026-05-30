@@ -66,3 +66,12 @@ test("mode config uses the expected intervals", () => {
 test("Binance base URL targets futures API", () => {
   assert.equal(BINANCE_BASE_URL, "https://fapi.binance.com");
 });
+
+test("configuration defaults are frozen", () => {
+  assert.equal(Object.isFrozen(BACKTEST_DEFAULTS), true);
+  assert.equal(Object.isFrozen(MODE_CONFIG), true);
+
+  for (const config of Object.values(MODE_CONFIG)) {
+    assert.equal(Object.isFrozen(config), true);
+  }
+});

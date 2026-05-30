@@ -1,36 +1,36 @@
-export const BACKTEST_DEFAULTS = {
+export const BACKTEST_DEFAULTS = Object.freeze({
   presetDays: 90,
   roundTripFeePct: 0.11,
   roundTripSlippagePct: 0.2,
-};
+});
 
-export const MODE_CONFIG = {
-  common: {
+export const MODE_CONFIG = Object.freeze({
+  common: Object.freeze({
     label: "공통 확정",
     interval: "60",
     waitCandles: 8,
-  },
-  scalp: {
+  }),
+  scalp: Object.freeze({
     label: "스캘핑",
     interval: "15",
     waitCandles: 6,
-  },
-  day: {
+  }),
+  day: Object.freeze({
     label: "단타",
     interval: "60",
     waitCandles: 12,
-  },
-  daily: {
+  }),
+  daily: Object.freeze({
     label: "데일리",
     interval: "240",
     waitCandles: 6,
-  },
-  swing: {
+  }),
+  swing: Object.freeze({
     label: "스윙",
     interval: "D",
     waitCandles: 4,
-  },
-};
+  }),
+});
 
 export const STORAGE_KEY = "signalcatch.settings.v1";
 export const BYBIT_BASE_URL = "https://api.bybit.com";
