@@ -6,32 +6,32 @@ export const BACKTEST_DEFAULTS = {
 
 export const MODE_CONFIG = {
   common: {
-    label: "Common",
+    label: "공통 확정",
     interval: "60",
     waitCandles: 8,
   },
   scalp: {
-    label: "Scalp",
+    label: "스캘핑",
     interval: "15",
     waitCandles: 6,
   },
   day: {
-    label: "Day",
-    interval: "240",
+    label: "단타",
+    interval: "60",
     waitCandles: 12,
   },
   daily: {
-    label: "Daily",
-    interval: "D",
+    label: "데일리",
+    interval: "240",
     waitCandles: 6,
   },
   swing: {
-    label: "Swing",
-    interval: "W",
+    label: "스윙",
+    interval: "D",
     waitCandles: 4,
   },
 };
 
 export const STORAGE_KEY = "signalcatch.settings.v1";
 export const BYBIT_BASE_URL = "https://api.bybit.com";
-export const BINANCE_BASE_URL = "https://api.binance.com";
+export const BINANCE_BASE_URL = "https://fapi.binance.com";
