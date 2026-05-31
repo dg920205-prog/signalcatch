@@ -222,6 +222,29 @@ test("rejects invalid mode classification inputs", () => {
   }
 });
 
+test("rejects out-of-range mode classification inputs", () => {
+  const validAnalysis = {
+    direction: "bull",
+    confidence: 74,
+    volumeRatio: 1.3,
+    trendStrength: 0.04,
+  };
+
+  for (const analysis of [
+    { ...validAnalysis, confidence: -1 },
+    { ...validAnalysis, confidence: 101 },
+    { ...validAnalysis, volumeRatio: -0.1 },
+    { ...validAnalysis, trendStrength: -0.01 },
+  ]) {
+    const modes = classifyModes(analysis);
+
+    for (const mode of Object.values(modes)) {
+      assert.equal(mode.eligible, false);
+      assert.equal(Array.isArray(mode.reasons), true);
+    }
+  }
+});
+
 test("calculates SMA and returns null for short input", () => {
   assert.equal(sma([1, 2, 3, 4], 3), 3);
   assert.equal(sma([1, 2], 3), null);
@@ -254,6 +277,17 @@ test("rejects malformed ATR candles", () => {
     ),
     null,
   );
+});
+
+test("rejects impossible and non-positive ATR candles", () => {
+  for (const malformed of [
+    { high: 12, low: 10, close: 13 },
+    { high: 12, low: 10, close: 9 },
+    { high: 12, low: -1, close: 10 },
+    { high: 0, low: 0, close: 0 },
+  ]) {
+    assert.equal(atr([malformed, candle(11), candle(12)], 3), null);
+  }
 });
 
 test("calculates current volume ratio from preceding candles only", () => {

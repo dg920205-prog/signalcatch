@@ -140,7 +140,11 @@ export function classifyModes(analysis = {}) {
     !["bull", "bear", "neutral"].includes(analysis.direction) ||
     ![analysis.confidence, analysis.volumeRatio, analysis.trendStrength].every(
       isFiniteNumber,
-    )
+    ) ||
+    analysis.confidence < 0 ||
+    analysis.confidence > 100 ||
+    analysis.volumeRatio < 0 ||
+    analysis.trendStrength < 0
   ) {
     return invalidModes();
   }

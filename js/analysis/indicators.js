@@ -20,7 +20,11 @@ function isValidCandle(candle) {
     isFiniteNumber(candle.high) &&
     isFiniteNumber(candle.low) &&
     isFiniteNumber(candle.close) &&
-    candle.high >= candle.low
+    candle.high > 0 &&
+    candle.low > 0 &&
+    candle.close > 0 &&
+    candle.low <= candle.close &&
+    candle.close <= candle.high
   );
 }
 
