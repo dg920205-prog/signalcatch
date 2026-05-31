@@ -49,6 +49,14 @@ function createUrl(path, params) {
 }
 
 function requireBybitList(payload, operation) {
+  if (payload?.retCode === 10006) {
+    throw new ApiDiagnosticError(
+      "rate-limit",
+      "Bybit 호출 제한에 도달했습니다. 잠시 후 다시 시도해 주세요.",
+      { exchange: EXCHANGE, operation, status: payload.retCode },
+    );
+  }
+
   if (!payload || payload.retCode !== 0 || !Array.isArray(payload.result?.list)) {
     throw formatError(operation);
   }
@@ -159,7 +167,7 @@ export async function fetchBybitTicker(input) {
 
   return {
     symbol,
-    price: toPositiveNumber(ticker.markPrice, "티커 조회"),
+    price: toPositiveNumber(ticker.lastPrice, "티커 조회"),
   };
 }
 

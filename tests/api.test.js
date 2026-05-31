@@ -237,13 +237,33 @@ test("classifies timeout abort as a network diagnostic", async () => {
   );
 });
 
-test("fetches a valid Bybit ticker mark price", async () => {
+test("classifies Bybit retCode 10006 failures as rate limits", async () => {
+  await withFetchStub(
+    async () =>
+      new Response(
+        JSON.stringify({
+          retCode: 10006,
+          retMsg: "Too many visits!",
+          result: {},
+        }),
+      ),
+    async () => {
+      await assert.rejects(
+        fetchBybitTicker("btc"),
+        (error) =>
+          error instanceof ApiDiagnosticError && error.kind === "rate-limit",
+      );
+    },
+  );
+});
+
+test("fetches a valid Bybit ticker last price", async () => {
   await withFetchStub(
     async () =>
       new Response(
         JSON.stringify({
           retCode: 0,
-          result: { list: [{ symbol: "BTCUSDT", markPrice: "123.45" }] },
+          result: { list: [{ symbol: "BTCUSDT", lastPrice: "123.45" }] },
         }),
       ),
     async () => {
@@ -255,13 +275,13 @@ test("fetches a valid Bybit ticker mark price", async () => {
   );
 });
 
-test("rejects null Bybit ticker mark prices", async () => {
+test("rejects null Bybit ticker last prices", async () => {
   await withFetchStub(
     async () =>
       new Response(
         JSON.stringify({
           retCode: 0,
-          result: { list: [{ symbol: "BTCUSDT", markPrice: null }] },
+          result: { list: [{ symbol: "BTCUSDT", lastPrice: null }] },
         }),
       ),
     async () => {
@@ -274,13 +294,13 @@ test("rejects null Bybit ticker mark prices", async () => {
   );
 });
 
-test("rejects non-positive Bybit ticker mark prices", async () => {
+test("rejects non-positive Bybit ticker last prices", async () => {
   await withFetchStub(
     async () =>
       new Response(
         JSON.stringify({
           retCode: 0,
-          result: { list: [{ symbol: "BTCUSDT", markPrice: "0" }] },
+          result: { list: [{ symbol: "BTCUSDT", lastPrice: "0" }] },
         }),
       ),
     async () => {
@@ -292,14 +312,14 @@ test("rejects non-positive Bybit ticker mark prices", async () => {
   );
 });
 
-test("rejects coerced Bybit ticker mark prices", async () => {
-  for (const markPrice of [true, ["123.45"]]) {
+test("rejects coerced Bybit ticker last prices", async () => {
+  for (const lastPrice of [true, ["123.45"]]) {
     await withFetchStub(
       async () =>
         new Response(
           JSON.stringify({
             retCode: 0,
-            result: { list: [{ symbol: "BTCUSDT", markPrice }] },
+            result: { list: [{ symbol: "BTCUSDT", lastPrice }] },
           }),
         ),
       async () => {
@@ -312,14 +332,14 @@ test("rejects coerced Bybit ticker mark prices", async () => {
   }
 });
 
-test("rejects non-decimal Bybit ticker mark prices", async () => {
-  for (const markPrice of ["0x10", "0b10", "0o10"]) {
+test("rejects non-decimal Bybit ticker last prices", async () => {
+  for (const lastPrice of ["0x10", "0b10", "0o10"]) {
     await withFetchStub(
       async () =>
         new Response(
           JSON.stringify({
             retCode: 0,
-            result: { list: [{ symbol: "BTCUSDT", markPrice }] },
+            result: { list: [{ symbol: "BTCUSDT", lastPrice }] },
           }),
         ),
       async () => {
@@ -417,7 +437,13 @@ test("rejects invalid Bybit candle semantics", () => {
 
 test("fetches a valid Binance ticker price", async () => {
   await withFetchStub(
-    async () => new Response(JSON.stringify({ symbol: "BTCUSDT", price: "123.45" })),
+    async (url) => {
+      assert.equal(
+        String(url),
+        "https://fapi.binance.com/fapi/v2/ticker/price?symbol=BTCUSDT",
+      );
+      return new Response(JSON.stringify({ symbol: "BTCUSDT", price: "123.45" }));
+    },
     async () => {
       assert.deepEqual(await fetchBinanceTicker("btc"), {
         symbol: "BTCUSDT",

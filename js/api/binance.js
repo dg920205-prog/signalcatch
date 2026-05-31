@@ -105,7 +105,7 @@ function validateCandleOptions({ interval, limit, start, end }, operation) {
 export async function fetchBinanceTicker(input) {
   const symbol = toUsdtSymbol(input);
   const payload = await fetchJson(
-    createUrl("/fapi/v1/ticker/price", { symbol }),
+    createUrl("/fapi/v2/ticker/price", { symbol }),
     { exchange: EXCHANGE, operation: "티커 조회" },
   );
 
