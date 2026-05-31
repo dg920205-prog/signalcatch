@@ -12,12 +12,13 @@ const CSV_COLUMNS = [
   "holdCandles",
 ];
 
-const FORMULA_PREFIX = /^[=+\-@\t\r\n＝＋－＠]/;
+const RAW_UNSAFE_PREFIX = /^[=+\-@\t\r\n\uFF1D\uFF0B\uFF0D\uFF20]/;
+const FORMULA_PREFIX = /^[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
 
 function guardFormula(value) {
   if (
     typeof value === "string" &&
-    FORMULA_PREFIX.test(value.trimStart())
+    (RAW_UNSAFE_PREFIX.test(value) || FORMULA_PREFIX.test(value.trimStart()))
   ) {
     return `'${value}`;
   }

@@ -101,6 +101,56 @@ test("summarizeTrades excludes malformed numeric fields from calculations", () =
   });
 });
 
+test("summarizeTrades excludes out-of-range numeric fields and returns finite metrics", () => {
+  const summary = summarizeTrades([
+    { status: "closed", outcome: "win", pnlPct: 4, rr: 2, holdCandles: 3 },
+    {
+      status: "closed",
+      outcome: "win",
+      pnlPct: Number.MAX_VALUE,
+      rr: Number.MAX_VALUE,
+      holdCandles: Number.MAX_SAFE_INTEGER + 1,
+    },
+    {
+      status: "closed",
+      outcome: "loss",
+      pnlPct: Number.MAX_VALUE,
+      rr: 100.01,
+      holdCandles: Number.MAX_VALUE,
+    },
+  ]);
+
+  assert.deepEqual(summary, {
+    closedTrades: 3,
+    wins: 2,
+    losses: 1,
+    winRatePct: 2 / 3 * 100,
+    unfilledTrades: 0,
+    maxDrawdownPct: 0,
+    compoundedReturnPct: 4,
+    avgRR: 2,
+    expectancyPct: 4,
+    profitFactor: 0,
+    averageHoldCandles: 3,
+    maxConsecutiveLosses: 1,
+  });
+  assert.ok(Object.values(summary).every(Number.isFinite));
+});
+
+test("summarizeTrades keeps derived metrics finite when valid returns compound beyond numeric limits", () => {
+  const summary = summarizeTrades(
+    Array.from({ length: 200 }, () => ({
+      status: "closed",
+      outcome: "win",
+      pnlPct: 10000,
+      rr: 100,
+      holdCandles: Number.MAX_SAFE_INTEGER,
+    })),
+  );
+
+  assert.ok(Object.values(summary).every(Number.isFinite));
+});
+
 test("tradesToCsv exports explicit columns in a stable order", () => {
   assert.equal(
     tradesToCsv([
@@ -144,6 +194,9 @@ test("tradesToCsv prefixes formula-like string cells before CSV escaping", () =>
     "\t=1",
     "\r=1",
     "\n=1",
+    "\tcmd",
+    "\rcmd",
+    "\ncmd",
     "  =trimmed",
     "＝1+1",
     "＋cmd",
