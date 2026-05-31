@@ -15,6 +15,12 @@ function candle(close, volume = 100) {
   };
 }
 
+function trendingCandles(start, step) {
+  return Array.from({ length: 30 }, (_, index) =>
+    candle(start + step * index, 100 + index * 10),
+  );
+}
+
 test("returns a neutral analysis when candles are insufficient", () => {
   assert.deepEqual(analyzeCandles([candle(100), candle(101)]), {
     direction: "neutral",
@@ -62,6 +68,51 @@ test("classifies common and day modes independently", () => {
   assert.equal(modes.common.eligible, true);
   assert.equal(modes.day.eligible, true);
   assert.equal(typeof modes.swing.eligible, "boolean");
+});
+
+test("analyzes rising candles with the complete signal contract", () => {
+  const analysis = analyzeCandles(trendingCandles(100, 2));
+
+  assert.equal(analysis.direction, "bull");
+  assert.equal(typeof analysis.score, "number");
+  assert.equal(typeof analysis.confidence, "number");
+  assert.equal(typeof analysis.atr, "number");
+  assert.equal(analysis.close, 158);
+  assert.equal(typeof analysis.volumeRatio, "number");
+  assert.equal(typeof analysis.trendStrength, "number");
+  assert.equal(Array.isArray(analysis.reasons), true);
+  assert.equal(analysis.reasons.some((reason) => /[가-힣]/.test(reason)), true);
+});
+
+test("analyzes falling candles as bearish", () => {
+  const analysis = analyzeCandles(trendingCandles(200, -2));
+
+  assert.equal(analysis.direction, "bear");
+  assert.equal(analysis.score < 0, true);
+  assert.equal(analysis.confidence > 0, true);
+  assert.equal(Array.isArray(analysis.reasons), true);
+});
+
+test("classifies every supported mode with a stable result shape", () => {
+  const modes = classifyModes({
+    direction: "bull",
+    confidence: 74,
+    volumeRatio: 1.3,
+    trendStrength: 0.04,
+  });
+
+  assert.deepEqual(Object.keys(modes), [
+    "common",
+    "scalp",
+    "day",
+    "daily",
+    "swing",
+  ]);
+
+  for (const mode of Object.values(modes)) {
+    assert.equal(typeof mode.eligible, "boolean");
+    assert.equal(Array.isArray(mode.reasons), true);
+  }
 });
 
 test("calculates SMA and returns null for short input", () => {
