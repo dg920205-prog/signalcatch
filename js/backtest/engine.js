@@ -11,6 +11,10 @@ function isNonNegativeNumber(value) {
   return isFiniteNumber(value) && value >= 0;
 }
 
+function isValidCostPct(value) {
+  return isNonNegativeNumber(value) && value <= 10;
+}
+
 function isPositiveNumber(value) {
   return isFiniteNumber(value) && value > 0;
 }
@@ -58,7 +62,7 @@ function validateSimulationInput({ plan, futureCandles, waitCandles, costPct }) 
     !Array.isArray(futureCandles) ||
     !futureCandles.every(isValidCandle) ||
     !isValidWaitCandles(waitCandles) ||
-    !isNonNegativeNumber(costPct)
+    !isValidCostPct(costPct)
   ) {
     throw new TypeError("Invalid planned trade simulation input");
   }
@@ -73,13 +77,18 @@ function closeTrade(plan, entryPrice, exitPrice, holdCandles, costPct) {
     plan.direction === "bull"
       ? ((exitPrice - entryPrice) / entryPrice) * 100
       : ((entryPrice - exitPrice) / entryPrice) * 100;
+  const pnlPct = grossPnlPct - costPct;
+
+  if (!Number.isFinite(pnlPct)) {
+    throw new TypeError("Invalid planned trade pnl");
+  }
 
   return {
     status: "closed",
     outcome: exitPrice === plan.tp ? "win" : "loss",
     entryPrice,
     exitPrice,
-    pnlPct: grossPnlPct - costPct,
+    pnlPct,
     holdCandles,
   };
 }
@@ -140,9 +149,9 @@ function validateBacktestInput({
     !candles.every(isValidCandle) ||
     !SUPPORTED_MODES.has(mode) ||
     !isValidWaitCandles(waitCandles) ||
-    !isNonNegativeNumber(feePct) ||
-    !isNonNegativeNumber(slippagePct) ||
-    !Number.isFinite(feePct + slippagePct) ||
+    !isValidCostPct(feePct) ||
+    !isValidCostPct(slippagePct) ||
+    !isValidCostPct(feePct + slippagePct) ||
     typeof analyze !== "function" ||
     typeof classify !== "function" ||
     typeof makePlan !== "function" ||

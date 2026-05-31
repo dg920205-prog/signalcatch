@@ -155,7 +155,7 @@ test("rejects invalid costs, waits, plans, and candles", () => {
     costPct: 0,
   };
 
-  for (const costPct of [-0.01, Number.POSITIVE_INFINITY, "0.31"]) {
+  for (const costPct of [-0.01, 10.01, Number.POSITIVE_INFINITY, "0.31"]) {
     assert.throws(() => simulatePlannedTrade({ ...valid, costPct }), TypeError);
   }
   for (const waitCandles of [-1, 1.5, Number.POSITIVE_INFINITY, "1"]) {
@@ -180,6 +180,48 @@ test("rejects invalid costs, waits, plans, and candles", () => {
       TypeError,
     );
   }
+});
+
+test("accepts the maximum planned trade cost", () => {
+  assert.deepEqual(
+    simulatePlannedTrade({
+      plan: bullPlan,
+      futureCandles: [candle()],
+      waitCandles: 1,
+      costPct: 10,
+    }),
+    { status: "unfilled" },
+  );
+});
+
+test("rejects non-finite pnl calculations from extreme finite prices", () => {
+  const min = Number.MIN_VALUE;
+  const plan = {
+    direction: "bull",
+    entryLow: min * 2,
+    entryHigh: min * 3,
+    tp: Number.MAX_VALUE,
+    sl: min,
+    rr: 1.5,
+  };
+
+  assert.throws(
+    () =>
+      simulatePlannedTrade({
+        plan,
+        futureCandles: [
+          candle({
+            open: min * 3,
+            high: Number.MAX_VALUE,
+            low: min * 2,
+            close: min * 3,
+          }),
+        ],
+        waitCandles: 1,
+        costPct: 0,
+      }),
+    TypeError,
+  );
 });
 
 test("runBacktest passes only historical candles into signal analysis", () => {
@@ -277,10 +319,30 @@ test("runBacktest rejects malformed options", () => {
     { ...valid, candles: "candles" },
     { ...valid, mode: "weekly" },
     { ...valid, feePct: -1 },
+    { ...valid, feePct: 10.01 },
+    { ...valid, feePct: Number.POSITIVE_INFINITY },
+    { ...valid, feePct: "0.1" },
     { ...valid, slippagePct: Number.NaN },
+    { ...valid, slippagePct: 10.01 },
+    { ...valid, slippagePct: Number.POSITIVE_INFINITY },
+    { ...valid, slippagePct: "0.1" },
+    { ...valid, feePct: 6, slippagePct: 4.01 },
     { ...valid, waitCandles: 0.5 },
     { ...valid, symbol: 123 },
   ]) {
     assert.throws(() => runBacktest(options), TypeError);
   }
+});
+
+test("runBacktest accepts the maximum combined cost", () => {
+  assert.deepEqual(
+    runBacktest({
+      candles: [candle()],
+      mode: "common",
+      waitCandles: 1,
+      feePct: 6,
+      slippagePct: 4,
+    }),
+    [],
+  );
 });
