@@ -141,6 +141,25 @@ test("returns a concrete neutral reason for invalid OHLCV candles", () => {
   }
 });
 
+test("returns a neutral result for impossible OHLC candles", () => {
+  for (const [field, value] of [
+    ["open", 161],
+    ["open", 155],
+    ["close", 161],
+    ["close", 155],
+  ]) {
+    const candles = trendingCandles(100, 2);
+    candles.at(-1)[field] = value;
+
+    assert.deepEqual(analyzeCandles(candles), {
+      direction: "neutral",
+      score: 0,
+      confidence: 0,
+      reasons: ["유효한 캔들 데이터가 필요합니다."],
+    });
+  }
+});
+
 test("returns a neutral result when trend strength overflows", () => {
   const candles = trendingCandles(100, 2);
   candles.at(-1).open = Number.MIN_VALUE;
@@ -175,6 +194,31 @@ test("classifies every supported mode with a stable result shape", () => {
   for (const mode of Object.values(modes)) {
     assert.equal(typeof mode.eligible, "boolean");
     assert.equal(Array.isArray(mode.reasons), true);
+  }
+});
+
+test("rejects invalid mode classification inputs", () => {
+  const validAnalysis = {
+    direction: "bull",
+    confidence: 74,
+    volumeRatio: 1.3,
+    trendStrength: 0.04,
+  };
+  const invalidAnalyses = [
+    { ...validAnalysis, direction: "sideways" },
+    ...["confidence", "volumeRatio", "trendStrength"].flatMap((field) => [
+      { ...validAnalysis, [field]: Number.POSITIVE_INFINITY },
+      { ...validAnalysis, [field]: String(validAnalysis[field]) },
+    ]),
+  ];
+
+  for (const analysis of invalidAnalyses) {
+    const modes = classifyModes(analysis);
+
+    for (const mode of Object.values(modes)) {
+      assert.equal(mode.eligible, false);
+      assert.equal(Array.isArray(mode.reasons), true);
+    }
   }
 });
 

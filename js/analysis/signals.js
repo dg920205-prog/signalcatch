@@ -19,7 +19,10 @@ function isValidCandle(candle) {
     ) &&
     isFiniteNumber(candle.volume) &&
     candle.volume >= 0 &&
-    candle.high >= candle.low
+    candle.low <= candle.open &&
+    candle.open <= candle.high &&
+    candle.low <= candle.close &&
+    candle.close <= candle.high
   );
 }
 
@@ -34,6 +37,17 @@ function neutralAnalysis(reason) {
 
 function modeResult(eligible, passReason, failReason) {
   return { eligible, reasons: [eligible ? passReason : failReason] };
+}
+
+function invalidModes() {
+  const reason = "모드 분류 입력이 유효하지 않습니다.";
+
+  return Object.fromEntries(
+    ["common", "scalp", "day", "daily", "swing"].map((mode) => [
+      mode,
+      { eligible: false, reasons: [reason] },
+    ]),
+  );
 }
 
 export function analyzeCandles(candles) {
@@ -120,11 +134,22 @@ export function analyzeCandles(candles) {
 }
 
 export function classifyModes(analysis = {}) {
+  if (
+    !analysis ||
+    typeof analysis !== "object" ||
+    !["bull", "bear", "neutral"].includes(analysis.direction) ||
+    ![analysis.confidence, analysis.volumeRatio, analysis.trendStrength].every(
+      isFiniteNumber,
+    )
+  ) {
+    return invalidModes();
+  }
+
   const {
-    direction = "neutral",
-    confidence = 0,
-    volumeRatio: currentVolumeRatio = 0,
-    trendStrength = 0,
+    direction,
+    confidence,
+    volumeRatio: currentVolumeRatio,
+    trendStrength,
   } = analysis;
   const hasDirection = ["bull", "bear"].includes(direction);
   const commonEligible =
