@@ -170,7 +170,7 @@ test("tradesToCsv exports explicit columns in a stable order", () => {
     ]),
     [
       "symbol,mode,status,outcome,signalIndex,signalTime,entryPrice,exitPrice,pnlPct,rr,holdCandles",
-      "ETHUSDT,day,closed,win,7,2026-05-30T00:00:00Z,100,104,4,1.5,3",
+      "'ETHUSDT,'day,'closed,'win,7,'2026-05-30T00:00:00Z,100,104,4,1.5,3",
     ].join("\r\n"),
   );
 });
@@ -180,7 +180,7 @@ test("tradesToCsv escapes quotes and line breaks", () => {
     tradesToCsv([{ symbol: 'ETH,"line\r\nbreak"', mode: "day" }]),
     [
       "symbol,mode,status,outcome,signalIndex,signalTime,entryPrice,exitPrice,pnlPct,rr,holdCandles",
-      '"ETH,""line\r\nbreak""",day,,,,,,,,,',
+      '"\'ETH,""linebreak""",\'day,,,,,,,,,',
     ].join("\r\n"),
   );
 });
@@ -206,7 +206,8 @@ test("tradesToCsv prefixes formula-like string cells before CSV escaping", () =>
   const csv = tradesToCsv(attacks.map((symbol) => ({ symbol })));
 
   for (const attack of attacks) {
-    const escaped = `'${attack}`.replaceAll('"', '""');
+    const sanitized = attack.replace(/[\u0000-\u001F\u007F]|\p{Cf}/gu, "");
+    const escaped = `'${sanitized}`.replaceAll('"', '""');
     const expectedCell = /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
     assert.ok(csv.includes(`${expectedCell},`), `missing escaped cell for ${attack}`);
   }
@@ -223,6 +224,47 @@ test("tradesToCsv removes hidden prefixes before formula injection checks", () =
     csv,
     [
       "symbol,mode,status,outcome,signalIndex,signalTime,entryPrice,exitPrice,pnlPct,rr,holdCandles",
+      "'=1,,,,,,,,,,",
+      "'=1,,,,,,,,,,",
+      "'=1,,,,,,,,,,",
+    ].join("\r\n"),
+  );
+});
+
+test("tradesToCsv prefixes every sanitized string cell but not trusted headers or safe primitives", () => {
+  assert.equal(
+    tradesToCsv([
+      {
+        symbol: "ETHUSDT",
+        mode: "'day",
+        status: "",
+        signalIndex: 7,
+        signalTime: true,
+        entryPrice: null,
+      },
+    ]),
+    [
+      "symbol,mode,status,outcome,signalIndex,signalTime,entryPrice,exitPrice,pnlPct,rr,holdCandles",
+      "'ETHUSDT,''day,',,7,true,,,,,",
+    ].join("\r\n"),
+  );
+});
+
+test("tradesToCsv removes Unicode format characters before prefixing text cells", () => {
+  const csv = tradesToCsv([
+    { symbol: "\u200e=1" },
+    { symbol: "\u200f=1" },
+    { symbol: "\u202a=1" },
+    { symbol: "\u2066=1" },
+    { symbol: "\u00ad=1" },
+  ]);
+
+  assert.equal(
+    csv,
+    [
+      "symbol,mode,status,outcome,signalIndex,signalTime,entryPrice,exitPrice,pnlPct,rr,holdCandles",
+      "'=1,,,,,,,,,,",
+      "'=1,,,,,,,,,,",
       "'=1,,,,,,,,,,",
       "'=1,,,,,,,,,,",
       "'=1,,,,,,,,,,",

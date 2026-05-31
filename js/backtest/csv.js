@@ -12,23 +12,11 @@ const CSV_COLUMNS = [
   "holdCandles",
 ];
 
-const RAW_UNSAFE_PREFIX = /^[=+\-@\t\r\n\uFF1D\uFF0B\uFF0D\uFF20]/;
-const FORMULA_PREFIX = /^[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
-const HIDDEN_CHARACTERS =
-  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200D\u2060\uFEFF]/g;
+const UNSAFE_CHARACTERS = /[\u0000-\u001F\u007F]|\p{Cf}/gu;
 
-function guardFormula(value) {
+function sanitizeString(value) {
   if (typeof value === "string") {
-    const sanitized = value.replace(HIDDEN_CHARACTERS, "");
-
-    if (
-      RAW_UNSAFE_PREFIX.test(value) ||
-      FORMULA_PREFIX.test(sanitized.trimStart())
-    ) {
-      return `'${sanitized}`;
-    }
-
-    return sanitized;
+    return `'${value.replace(UNSAFE_CHARACTERS, "")}`;
   }
 
   return value;
@@ -39,7 +27,7 @@ function escapeCsv(value) {
     return "";
   }
 
-  const text = String(guardFormula(value));
+  const text = String(sanitizeString(value));
 
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
