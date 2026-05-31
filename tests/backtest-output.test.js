@@ -211,3 +211,21 @@ test("tradesToCsv prefixes formula-like string cells before CSV escaping", () =>
     assert.ok(csv.includes(`${expectedCell},`), `missing escaped cell for ${attack}`);
   }
 });
+
+test("tradesToCsv removes hidden prefixes before formula injection checks", () => {
+  const csv = tradesToCsv([
+    { symbol: "\u0000=1" },
+    { symbol: "\u001f=1" },
+    { symbol: "\u200b=1" },
+  ]);
+
+  assert.equal(
+    csv,
+    [
+      "symbol,mode,status,outcome,signalIndex,signalTime,entryPrice,exitPrice,pnlPct,rr,holdCandles",
+      "'=1,,,,,,,,,,",
+      "'=1,,,,,,,,,,",
+      "'=1,,,,,,,,,,",
+    ].join("\r\n"),
+  );
+});

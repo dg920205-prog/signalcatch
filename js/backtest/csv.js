@@ -14,13 +14,21 @@ const CSV_COLUMNS = [
 
 const RAW_UNSAFE_PREFIX = /^[=+\-@\t\r\n\uFF1D\uFF0B\uFF0D\uFF20]/;
 const FORMULA_PREFIX = /^[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/;
+const HIDDEN_CHARACTERS =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200D\u2060\uFEFF]/g;
 
 function guardFormula(value) {
-  if (
-    typeof value === "string" &&
-    (RAW_UNSAFE_PREFIX.test(value) || FORMULA_PREFIX.test(value.trimStart()))
-  ) {
-    return `'${value}`;
+  if (typeof value === "string") {
+    const sanitized = value.replace(HIDDEN_CHARACTERS, "");
+
+    if (
+      RAW_UNSAFE_PREFIX.test(value) ||
+      FORMULA_PREFIX.test(sanitized.trimStart())
+    ) {
+      return `'${sanitized}`;
+    }
+
+    return sanitized;
   }
 
   return value;
