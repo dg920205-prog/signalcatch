@@ -30,13 +30,23 @@ test("returns a neutral analysis when candles are insufficient", () => {
   });
 });
 
+test("returns independent reasons arrays for insufficient candles", () => {
+  const first = analyzeCandles([]);
+  const second = analyzeCandles([]);
+
+  first.reasons.push("mutated");
+
+  assert.notEqual(first.reasons, second.reasons);
+  assert.deepEqual(second.reasons, ["분석에 필요한 캔들이 부족합니다."]);
+});
+
 test("builds a bullish trade plan", () => {
   assert.deepEqual(buildTradePlan({ direction: "bull", close: 100, atr: 4 }), {
     direction: "bull",
     entryLow: 98,
     entryHigh: 100,
     tp: 106,
-    sl: 94,
+    sl: 96,
     rr: 1.5,
   });
 });
@@ -47,7 +57,7 @@ test("builds a symmetric bearish trade plan", () => {
     entryLow: 100,
     entryHigh: 102,
     tp: 94,
-    sl: 106,
+    sl: 104,
     rr: 1.5,
   });
 });
@@ -55,6 +65,18 @@ test("builds a symmetric bearish trade plan", () => {
 test("rejects invalid trade plan inputs", () => {
   assert.equal(buildTradePlan({ direction: "neutral", close: 100, atr: 4 }), null);
   assert.equal(buildTradePlan({ direction: "bull", close: 100, atr: 0 }), null);
+  assert.equal(
+    buildTradePlan({ direction: "bull", close: Number.MAX_VALUE, atr: 4 }),
+    null,
+  );
+});
+
+test("uses the conservative entry price for the declared reward-risk ratio", () => {
+  const bull = buildTradePlan({ direction: "bull", close: 100, atr: 4 });
+  const bear = buildTradePlan({ direction: "bear", close: 100, atr: 4 });
+
+  assert.equal((bull.tp - bull.entryHigh) / (bull.entryHigh - bull.sl), bull.rr);
+  assert.equal((bear.entryLow - bear.tp) / (bear.sl - bear.entryLow), bear.rr);
 });
 
 test("classifies common and day modes independently", () => {
@@ -91,6 +113,47 @@ test("analyzes falling candles as bearish", () => {
   assert.equal(analysis.score < 0, true);
   assert.equal(analysis.confidence > 0, true);
   assert.equal(Array.isArray(analysis.reasons), true);
+});
+
+test("returns a concrete neutral reason for invalid OHLCV candles", () => {
+  for (const [field, value] of [
+    ["close", 0],
+    ["close", Number.NaN],
+    ["close", Number.POSITIVE_INFINITY],
+    ["open", 0],
+    ["open", Number.POSITIVE_INFINITY],
+    ["high", 0],
+    ["high", Number.NaN],
+    ["low", 0],
+    ["low", Number.POSITIVE_INFINITY],
+    ["volume", -1],
+    ["volume", Number.POSITIVE_INFINITY],
+  ]) {
+    const candles = trendingCandles(100, 2);
+    candles.at(-1)[field] = value;
+
+    assert.deepEqual(analyzeCandles(candles), {
+      direction: "neutral",
+      score: 0,
+      confidence: 0,
+      reasons: ["유효한 캔들 데이터가 필요합니다."],
+    });
+  }
+});
+
+test("returns a neutral result when trend strength overflows", () => {
+  const candles = trendingCandles(100, 2);
+  candles.at(-1).open = Number.MIN_VALUE;
+  candles.at(-1).high = Number.MIN_VALUE;
+  candles.at(-1).low = Number.MIN_VALUE;
+  candles.at(-1).close = Number.MIN_VALUE;
+
+  assert.deepEqual(analyzeCandles(candles), {
+    direction: "neutral",
+    score: 0,
+    confidence: 0,
+    reasons: ["유효한 캔들 데이터가 필요합니다."],
+  });
 });
 
 test("classifies every supported mode with a stable result shape", () => {
@@ -155,4 +218,26 @@ test("calculates current volume ratio from preceding candles only", () => {
     3,
   );
   assert.equal(volumeRatio([candle(10, 100), candle(11, 200)], 2), null);
+});
+
+test("returns null when indicator calculations overflow", () => {
+  const max = Number.MAX_VALUE;
+
+  assert.equal(sma([max, max], 2), null);
+  assert.equal(ema([max, max], 2), null);
+  assert.equal(rsi([max, -max, max], 2), null);
+  assert.equal(
+    atr(
+      [
+        { high: max, low: 1, close: max },
+        { high: max, low: 1, close: max },
+      ],
+      2,
+    ),
+    null,
+  );
+  assert.equal(
+    volumeRatio([candle(10, max), candle(11, max), candle(12, max)], 2),
+    null,
+  );
 });

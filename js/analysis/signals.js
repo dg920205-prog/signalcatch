@@ -7,6 +7,22 @@ const INSUFFICIENT_CANDLES = {
   reasons: ["분석에 필요한 캔들이 부족합니다."],
 };
 
+function isFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isValidCandle(candle) {
+  return (
+    candle &&
+    ["open", "high", "low", "close"].every(
+      (field) => isFiniteNumber(candle[field]) && candle[field] > 0,
+    ) &&
+    isFiniteNumber(candle.volume) &&
+    candle.volume >= 0 &&
+    candle.high >= candle.low
+  );
+}
+
 function neutralAnalysis(reason) {
   return {
     direction: "neutral",
@@ -22,7 +38,14 @@ function modeResult(eligible, passReason, failReason) {
 
 export function analyzeCandles(candles) {
   if (!Array.isArray(candles) || candles.length < 30) {
-    return { ...INSUFFICIENT_CANDLES };
+    return {
+      ...INSUFFICIENT_CANDLES,
+      reasons: [...INSUFFICIENT_CANDLES.reasons],
+    };
+  }
+
+  if (!candles.every(isValidCandle)) {
+    return neutralAnalysis("유효한 캔들 데이터가 필요합니다.");
   }
 
   const closes = candles.map((candle) => candle?.close);
@@ -73,7 +96,7 @@ export function analyzeCandles(candles) {
 
   const direction = score >= 40 ? "bull" : score <= -40 ? "bear" : "neutral";
 
-  return {
+  const analysis = {
     direction,
     score,
     confidence: Math.min(Math.abs(score), 100),
@@ -83,6 +106,17 @@ export function analyzeCandles(candles) {
     volumeRatio: currentVolumeRatio,
     trendStrength: Math.abs(fastEma - slowSma) / close,
   };
+
+  return [
+    analysis.score,
+    analysis.confidence,
+    analysis.atr,
+    analysis.close,
+    analysis.volumeRatio,
+    analysis.trendStrength,
+  ].every(isFiniteNumber)
+    ? analysis
+    : neutralAnalysis("유효한 캔들 데이터가 필요합니다.");
 }
 
 export function classifyModes(analysis = {}) {

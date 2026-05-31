@@ -10,6 +10,10 @@ function hasNumbers(values) {
   return Array.isArray(values) && values.every(isFiniteNumber);
 }
 
+function finiteOrNull(value) {
+  return isFiniteNumber(value) ? value : null;
+}
+
 function isValidCandle(candle) {
   return (
     candle &&
@@ -26,7 +30,7 @@ export function sma(values, period) {
   }
 
   const window = values.slice(-period);
-  return window.reduce((sum, value) => sum + value, 0) / period;
+  return finiteOrNull(window.reduce((sum, value) => sum + value, 0) / period);
 }
 
 export function ema(values, period) {
@@ -38,8 +42,16 @@ export function ema(values, period) {
   let result =
     values.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
 
+  if (!isFiniteNumber(result)) {
+    return null;
+  }
+
   for (let index = period; index < values.length; index += 1) {
     result = (values[index] - result) * multiplier + result;
+
+    if (!isFiniteNumber(result)) {
+      return null;
+    }
   }
 
   return result;
@@ -59,8 +71,17 @@ export function rsi(values, period = 14) {
 
   for (let index = 1; index <= period; index += 1) {
     const change = values[index] - values[index - 1];
+
+    if (!isFiniteNumber(change)) {
+      return null;
+    }
+
     totalGain += Math.max(change, 0);
     totalLoss += Math.max(-change, 0);
+  }
+
+  if (!isFiniteNumber(totalGain) || !isFiniteNumber(totalLoss)) {
+    return null;
   }
 
   let averageGain = totalGain / period;
@@ -68,15 +89,24 @@ export function rsi(values, period = 14) {
 
   for (let index = period + 1; index < values.length; index += 1) {
     const change = values[index] - values[index - 1];
+
+    if (!isFiniteNumber(change)) {
+      return null;
+    }
+
     averageGain = (averageGain * (period - 1) + Math.max(change, 0)) / period;
     averageLoss = (averageLoss * (period - 1) + Math.max(-change, 0)) / period;
+
+    if (!isFiniteNumber(averageGain) || !isFiniteNumber(averageLoss)) {
+      return null;
+    }
   }
 
   if (averageLoss === 0) {
     return averageGain === 0 ? 50 : 100;
   }
 
-  return 100 - 100 / (1 + averageGain / averageLoss);
+  return finiteOrNull(100 - 100 / (1 + averageGain / averageLoss));
 }
 
 export function atr(candles, period = 14) {
@@ -102,11 +132,23 @@ export function atr(candles, period = 14) {
     );
   });
 
+  if (!trueRanges.every(isFiniteNumber)) {
+    return null;
+  }
+
   let result =
     trueRanges.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
 
+  if (!isFiniteNumber(result)) {
+    return null;
+  }
+
   for (let index = period; index < trueRanges.length; index += 1) {
     result = (result * (period - 1) + trueRanges[index]) / period;
+
+    if (!isFiniteNumber(result)) {
+      return null;
+    }
   }
 
   return result;
@@ -131,5 +173,7 @@ export function volumeRatio(candles, period = 20) {
   const average =
     previousVolumes.reduce((sum, volume) => sum + volume, 0) / period;
 
-  return average > 0 ? volumes.at(-1) / average : null;
+  return average > 0 && isFiniteNumber(average)
+    ? finiteOrNull(volumes.at(-1) / average)
+    : null;
 }
