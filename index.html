@@ -22,13 +22,13 @@
     </header>
     <main class="dashboard-shell">
       <section id="summary-grid" class="summary-grid" aria-label="Dashboard summary"></section>
-      <nav class="tabs" aria-label="Dashboard views">
-        <button type="button" role="tab" data-tab="manual">Manual assets</button>
-        <button type="button" role="tab" data-tab="scanner">Scanner</button>
-        <button type="button" role="tab" data-tab="backtest">Backtest</button>
-        <button type="button" role="tab" data-tab="auxiliary">Auxiliary</button>
+      <nav class="tabs" role="tablist" aria-label="Dashboard views">
+        <button id="manual-tab" type="button" role="tab" aria-controls="manual-panel" aria-selected="true" data-tab="manual">Manual assets</button>
+        <button id="scanner-tab" type="button" role="tab" aria-controls="scanner-panel" aria-selected="false" data-tab="scanner">Scanner</button>
+        <button id="backtest-tab" type="button" role="tab" aria-controls="backtest-panel" aria-selected="false" data-tab="backtest">Backtest</button>
+        <button id="auxiliary-tab" type="button" role="tab" aria-controls="auxiliary-panel" aria-selected="false" data-tab="auxiliary">Auxiliary</button>
       </nav>
-      <section id="manual-panel" class="panel" data-panel="manual">
+      <section id="manual-panel" class="panel" role="tabpanel" aria-labelledby="manual-tab" data-panel="manual">
         <div class="section-heading"><div><p class="eyebrow">WATCHLIST</p><h2>Manual assets</h2></div><p class="muted">Cards stay visible while data is loading or unavailable.</p></div>
         <form id="manual-form" class="inline-form">
           <label>Symbol<input name="symbol" placeholder="HBAR" required></label>
@@ -37,26 +37,26 @@
         </form>
         <div id="manual-grid" class="asset-grid"><p class="empty-state">Add a symbol to begin monitoring.</p></div>
       </section>
-      <section id="scanner-panel" class="panel" data-panel="scanner" hidden>
+      <section id="scanner-panel" class="panel" role="tabpanel" aria-labelledby="scanner-tab" data-panel="scanner" hidden>
         <div class="section-heading"><div><p class="eyebrow">BYBIT FIRST</p><h2>Market scanner</h2></div></div>
         <div class="toolbar"><label>Universe<select id="scanner-universe"><option>Bybit USDT perpetuals</option></select></label><button type="button">Run scanner</button></div>
-        <div class="progress-row"><progress id="scanner-progress" value="0" max="1"></progress><span>0 / 0</span></div>
+        <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress><span>0 / 0</span></div>
         <div id="scanner-results" class="table-wrap"><p class="empty-state">Scanner results will appear here.</p></div>
       </section>
-      <section id="backtest-panel" class="panel" data-panel="backtest" hidden>
+      <section id="backtest-panel" class="panel" role="tabpanel" aria-labelledby="backtest-tab" data-panel="backtest" hidden>
         <div class="section-heading"><div><p class="eyebrow">HISTORICAL TEST</p><h2>Backtest laboratory</h2></div></div>
         <form id="backtest-form" class="backtest-form">
-          <fieldset><legend>Window</legend><div class="preset-row"><button type="button" data-preset-days="30">30d</button><button type="button" data-preset-days="90">90d</button><button type="button" data-preset-days="180">180d</button><button type="button" data-preset-days="365">365d</button></div><input id="backtest-days" name="presetDays" type="number" value="90" min="1" max="365"><label>Start<input name="startDate" type="date"></label><label>End<input name="endDate" type="date"></label></fieldset>
+          <fieldset><legend>Window</legend><div class="preset-row"><button type="button" data-preset-days="30">30d</button><button type="button" data-preset-days="90">90d</button><button type="button" data-preset-days="180">180d</button><button type="button" data-preset-days="365">365d</button></div><label for="backtest-days">Preset days</label><input id="backtest-days" name="presetDays" type="number" value="90" min="1" max="365"><label>Start<input name="startDate" type="date"></label><label>End<input name="endDate" type="date"></label></fieldset>
           <fieldset><legend>Costs</legend><label>Round-trip fee %<input name="roundTripFeePct" type="number" value="0.11" min="0" max="10" step="0.01"></label><label>Slippage %<input name="roundTripSlippagePct" type="number" value="0.20" min="0" max="10" step="0.01"></label></fieldset>
-          <fieldset><legend>Wait candles by mode</legend><div class="field-grid"><label>Common<input name="waitCommon" type="number" value="8" min="1" max="500"></label><label>Scalp<input name="waitScalp" type="number" value="8" min="1" max="500"></label><label>Day<input name="waitDay" type="number" value="8" min="1" max="500"></label><label>Daily<input name="waitDaily" type="number" value="8" min="1" max="500"></label><label>Swing<input name="waitSwing" type="number" value="8" min="1" max="500"></label></div></fieldset>
-          <fieldset><legend>Selected symbols</legend><label><input name="symbols" placeholder="BTC, ETH, HBAR"></label><button type="submit">Run backtest</button></fieldset>
+          <fieldset><legend>Wait candles by mode</legend><div class="field-grid"><label>Common<input name="waitCommon" type="number" value="8" min="1" max="500"></label><label>Scalp<input name="waitScalp" type="number" value="6" min="1" max="500"></label><label>Day<input name="waitDay" type="number" value="12" min="1" max="500"></label><label>Daily<input name="waitDaily" type="number" value="6" min="1" max="500"></label><label>Swing<input name="waitSwing" type="number" value="4" min="1" max="500"></label></div></fieldset>
+          <fieldset><legend>Selected symbols</legend><label for="backtest-symbols">Symbols</label><input id="backtest-symbols" name="symbols" placeholder="BTC, ETH, HBAR"><button type="submit">Run backtest</button></fieldset>
         </form>
         <div id="backtest-metrics" class="metrics-grid"></div>
         <section class="chart-card"><h3>Equity curve</h3><div id="equity-chart" class="chart-container"><svg viewBox="0 0 800 180" role="img" aria-label="Equity curve placeholder"><polyline points="0,150 200,125 400,135 600,80 800,55"></polyline></svg></div></section>
         <div class="split-grid"><section><h3>By symbol</h3><div id="symbol-summary" class="table-wrap"></div></section><section><h3>By mode</h3><div id="mode-summary" class="table-wrap"></div></section></div>
         <section><div class="section-heading"><h3>Trades</h3><button type="button">Export CSV</button></div><div id="trade-results" class="table-wrap"></div></section>
       </section>
-      <section id="auxiliary-panel" class="panel" data-panel="auxiliary" hidden>
+      <section id="auxiliary-panel" class="panel" role="tabpanel" aria-labelledby="auxiliary-tab" data-panel="auxiliary" hidden>
         <div class="section-heading"><div><p class="eyebrow">CONTEXT</p><h2>Auxiliary signals</h2></div></div>
         <details class="auxiliary-item"><summary>Market regime</summary><p>Market context will appear after data is connected.</p></details>
         <details class="auxiliary-item"><summary>Diagnostics</summary><p>Operational notes and safe diagnostic summaries will appear here.</p></details>

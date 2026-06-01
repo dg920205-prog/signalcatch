@@ -1,4 +1,14 @@
+import { safeText } from "./dom.js";
+
 const TABS = ["manual", "scanner", "backtest", "auxiliary"];
+
+function safeRead(value, key, fallback) {
+  try {
+    return value?.[key] ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function setApiStatus(node, status, { dom }) {
   const normalized = ["ready", "loading", "error"].includes(status) ? status : "idle";
@@ -9,9 +19,9 @@ export function setApiStatus(node, status, { dom }) {
 export function renderSummary(container, summary = {}, { dom }) {
   dom.clear(container);
   const cards = [
-    ["Manual assets", summary.manualAssets ?? 0],
-    ["Scanner results", summary.scannerResults ?? 0],
-    ["Backtest trades", summary.backtestTrades ?? 0],
+    ["Manual assets", safeText(safeRead(summary, "manualAssets", 0), 0)],
+    ["Scanner results", safeText(safeRead(summary, "scannerResults", 0), 0)],
+    ["Backtest trades", safeText(safeRead(summary, "backtestTrades", 0), 0)],
     ["API priority", "Bybit"],
   ];
   dom.append(container, cards.map(([label, value]) =>
@@ -37,8 +47,17 @@ export function activateTab(tab, root = document) {
 }
 
 export function bindTabs(root = document) {
-  for (const button of root.querySelectorAll("[data-tab]")) {
+  const buttons = [...root.querySelectorAll("[data-tab]")];
+  for (const [index, button] of buttons.entries()) {
     button.addEventListener("click", () => activateTab(button.getAttribute("data-tab"), root));
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+      event.preventDefault();
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const next = buttons[(index + direction + buttons.length) % buttons.length];
+      activateTab(next.getAttribute("data-tab"), root);
+      next.focus();
+    });
   }
   activateTab("manual", root);
 }

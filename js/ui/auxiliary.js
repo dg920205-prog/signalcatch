@@ -1,3 +1,13 @@
+import { safeText } from "./dom.js";
+
+function safeRead(value, key, fallback) {
+  try {
+    return value?.[key] ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function renderAuxiliary(container, items = [], { dom }) {
   dom.clear(container);
   if (items.length === 0) {
@@ -5,7 +15,7 @@ export function renderAuxiliary(container, items = [], { dom }) {
     return;
   }
   dom.append(container, items.map((item) => dom.el("details", { class: "auxiliary-item" },
-    dom.el("summary", {}, item.title ?? "Market context"),
-    dom.el("p", {}, item.reason ?? "No detail available."),
+    dom.el("summary", {}, safeText(safeRead(item, "title"), "Market context")),
+    dom.el("p", {}, safeText(safeRead(item, "reason"), "No detail available.")),
   )));
 }

@@ -1,30 +1,45 @@
+import { safeText } from "./dom.js";
+
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
+function safeRead(value, key, fallback) {
+  try {
+    return value?.[key] ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function renderDiagnostic(diagnostic = {}, dom) {
-  return dom.el("li", {}, `${diagnostic.kind ?? "unknown"} · ${diagnostic.operation ?? "unknown"}`);
+  return dom.el("li", {}, `${safeText(safeRead(diagnostic, "kind"), "unknown")} · ${safeText(safeRead(diagnostic, "operation"), "unknown")}`);
 }
 
 export function renderManualAssetCard(container, asset = {}, { dom }) {
-  const card = dom.el("article", { class: `asset-card status-${asset.status ?? "idle"}` },
+  const status = safeText(safeRead(asset, "status"), "idle");
+  const ticker = safeRead(asset, "ticker", {});
+  const modeResults = safeRead(asset, "modeResults", {});
+  const diagnostics = safeRead(asset, "diagnostics", []);
+  const error = safeRead(asset, "error", "");
+  const card = dom.el("article", { class: `asset-card status-${status}` },
     dom.el("div", { class: "card-heading" },
       dom.el("div", {},
-        dom.el("strong", {}, asset.symbol ?? "Unknown"),
-        dom.el("span", { class: "exchange-tag" }, asset.exchange ?? "Bybit"),
+        dom.el("strong", {}, safeText(safeRead(asset, "symbol"), "Unknown")),
+        dom.el("span", { class: "exchange-tag" }, safeText(safeRead(asset, "exchange"), "Bybit")),
       ),
-      dom.el("span", { class: "status-label" }, asset.status ?? "idle"),
+      dom.el("span", { class: "status-label" }, status),
     ),
-    dom.el("p", { class: "price" }, asset.ticker?.price ?? "Price pending"),
+    dom.el("p", { class: "price" }, safeText(safeRead(ticker, "price"), "Price pending")),
     dom.el("div", { class: "mode-row" }, MODES.map((mode) =>
-      dom.el("span", { class: asset.modeResults?.[mode]?.eligible ? "mode eligible" : "mode" }, mode))),
+      dom.el("span", { class: safeRead(safeRead(modeResults, mode, {}), "eligible", false) ? "mode eligible" : "mode" }, mode))),
   );
 
-  if (asset.error) {
-    dom.append(card, dom.el("p", { class: "error-text" }, asset.error));
+  if (safeText(error)) {
+    dom.append(card, dom.el("p", { class: "error-text" }, safeText(error)));
   }
-  if (asset.diagnostics?.length) {
+  if (Array.isArray(diagnostics) && diagnostics.length) {
     dom.append(card, dom.el("details", { class: "diagnostics" },
       dom.el("summary", {}, "Diagnostics"),
-      dom.el("ul", {}, asset.diagnostics.map((item) => renderDiagnostic(item, dom))),
+      dom.el("ul", {}, diagnostics.map((item) => renderDiagnostic(item, dom))),
     ));
   }
 

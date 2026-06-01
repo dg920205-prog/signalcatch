@@ -8,6 +8,14 @@ function isSafeAttribute(name) {
   return SAFE_ATTRIBUTES.has(name) || name.startsWith("aria-") || name.startsWith("data-");
 }
 
+export function safeText(value, fallback = "") {
+  return (
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  ) ? value : fallback;
+}
+
 export function createDom(documentRef = globalThis.document) {
   if (!documentRef?.createElement || !documentRef?.createTextNode) {
     throw new TypeError("A document implementation is required.");
