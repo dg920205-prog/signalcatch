@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   buildBacktestRequest,
   renderBacktestMetrics,
+  renderBacktestResults,
   renderTrades,
 } from "../js/ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary } from "../js/ui/dashboard.js";
@@ -12,6 +13,8 @@ import { createDom } from "../js/ui/dom.js";
 import { renderManualAssetCard, renderManualAssets } from "../js/ui/manual-assets.js";
 import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
+
+const INVALID_BACKTEST_SETTINGS = /잘못된 백테스트 설정입니다\./;
 
 class FakeNode {
   constructor(tagName = "#text") {
@@ -167,11 +170,11 @@ test("buildBacktestRequest rejects invalid costs, dates, waits, modes, and empty
     endDate: "2026-03-31",
   };
 
-  assert.throws(() => buildBacktestRequest({ ...valid, roundTripFeePct: -1 }), /fee/i);
-  assert.throws(() => buildBacktestRequest({ ...valid, startDate: "2026-04-01" }), /date/i);
-  assert.throws(() => buildBacktestRequest({ ...valid, waitCandles: { swing: 0 } }), /wait/i);
-  assert.throws(() => buildBacktestRequest({ ...valid, modes: ["turbo"] }), /mode/i);
-  assert.throws(() => buildBacktestRequest({ ...valid, selected: [] }), /symbol/i);
+  assert.throws(() => buildBacktestRequest({ ...valid, roundTripFeePct: -1 }), INVALID_BACKTEST_SETTINGS);
+  assert.throws(() => buildBacktestRequest({ ...valid, startDate: "2026-04-01" }), INVALID_BACKTEST_SETTINGS);
+  assert.throws(() => buildBacktestRequest({ ...valid, waitCandles: { swing: 0 } }), INVALID_BACKTEST_SETTINGS);
+  assert.throws(() => buildBacktestRequest({ ...valid, modes: ["turbo"] }), INVALID_BACKTEST_SETTINGS);
+  assert.throws(() => buildBacktestRequest({ ...valid, selected: [] }), INVALID_BACKTEST_SETTINGS);
 });
 
 test("buildBacktestRequest strictly validates dates, decimal inputs, and combined costs", () => {
@@ -183,17 +186,69 @@ test("buildBacktestRequest strictly validates dates, decimal inputs, and combine
   };
 
   for (const date of ["2026-02-31", "2026-13-01"]) {
-    assert.throws(() => buildBacktestRequest({ ...valid, startDate: date }), /date/i);
+    assert.throws(() => buildBacktestRequest({ ...valid, startDate: date }), INVALID_BACKTEST_SETTINGS);
   }
   for (const value of ["", true, {}, "1e2"]) {
-    assert.throws(() => buildBacktestRequest({ ...valid, roundTripFeePct: value }), /fee/i);
+    assert.throws(() => buildBacktestRequest({ ...valid, roundTripFeePct: value }), INVALID_BACKTEST_SETTINGS);
   }
   for (const value of ["", true, {}, "2.5"]) {
-    assert.throws(() => buildBacktestRequest({ ...valid, waitCandles: { scalp: value } }), /wait/i);
+    assert.throws(() => buildBacktestRequest({ ...valid, waitCandles: { scalp: value } }), INVALID_BACKTEST_SETTINGS);
   }
   assert.throws(
     () => buildBacktestRequest({ ...valid, roundTripFeePct: "9.9", roundTripSlippagePct: "0.2" }),
-    /cost/i,
+    INVALID_BACKTEST_SETTINGS,
+  );
+});
+
+test("buildBacktestRequest converts hostile form state boundaries into a safe settings error", () => {
+  const message = "잘못된 백테스트 설정입니다.";
+  const valid = {
+    symbols: ["BTC"],
+    selected: ["BTC"],
+    startDate: "2026-01-01",
+    endDate: "2026-03-31",
+  };
+  const throwingGetter = (property) => Object.defineProperty({ ...valid }, property, {
+    get() {
+      throw new Error("private getter");
+    },
+  });
+  const hostileArray = new Proxy(["BTC"], {
+    get(target, property) {
+      if (property === "length" || property === Symbol.iterator || property === "map") {
+        throw new Error("private collection");
+      }
+      return target[property];
+    },
+  });
+
+  for (const property of ["symbols", "selected", "modes", "startDate", "endDate", "roundTripFeePct", "roundTripSlippagePct", "waitCandles"]) {
+    assert.throws(() => buildBacktestRequest(throwingGetter(property)), new RegExp(message));
+  }
+  for (const property of ["symbols", "selected", "modes"]) {
+    assert.throws(() => buildBacktestRequest({ ...valid, [property]: hostileArray }), new RegExp(message));
+  }
+  assert.throws(
+    () => buildBacktestRequest({ ...valid, waitCandles: new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("private wait"); } }) }),
+    new RegExp(message),
+  );
+  assert.throws(
+    () => buildBacktestRequest(new Proxy({}, { get() { throw new Error("private form"); } })),
+    new RegExp(message),
+  );
+  assert.throws(
+    () => buildBacktestRequest(new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("private descriptor"); } })),
+    new RegExp(message),
+  );
+  const hostileIndex = ["BTC"];
+  Object.defineProperty(hostileIndex, 0, {
+    get() {
+      throw new Error("private index");
+    },
+  });
+  assert.throws(
+    () => buildBacktestRequest({ ...valid, symbols: hostileIndex }),
+    new RegExp(message),
   );
 });
 
@@ -286,6 +341,56 @@ test("renderers replace hostile text values without losing their containers", ()
 
   const summary = new FakeNode("section");
   assert.doesNotThrow(() => renderSummary(summary, { manualAssets: hostileText }, { dom }));
+});
+
+test("renderers replace hostile collections with safe empty output", () => {
+  const dom = createDom(createFakeDocument());
+  const hostile = new Proxy([], {
+    get(target, property) {
+      if (property === "length" || property === Symbol.iterator || property === "map") {
+        throw new Error("blocked");
+      }
+      return target[property];
+    },
+  });
+
+  const manual = new FakeNode("section");
+  assert.doesNotThrow(() => renderManualAssets(manual, hostile, { dom }));
+  assert.equal(flattenText(manual).includes("Add a symbol"), true);
+
+  const scanner = new FakeNode("section");
+  assert.doesNotThrow(() => renderScannerResults(scanner, hostile, { dom }));
+  assert.equal(flattenText(scanner).includes("Symbol"), true);
+
+  const trades = new FakeNode("section");
+  assert.doesNotThrow(() => renderBacktestResults(trades, hostile, { dom }));
+  assert.equal(flattenText(trades).includes("Outcome"), true);
+
+  const auxiliary = new FakeNode("section");
+  assert.doesNotThrow(() => renderAuxiliary(auxiliary, hostile, { dom }));
+  assert.equal(flattenText(auxiliary).includes("Auxiliary market context"), true);
+});
+
+test("renderer snapshots skip hostile collection indexes without using iterators or map", () => {
+  const dom = createDom(createFakeDocument());
+  const assets = [{ symbol: "BTC" }, { symbol: "ETH" }];
+  Object.defineProperty(assets, 0, {
+    get() {
+      throw new Error("blocked index");
+    },
+  });
+  const collection = new Proxy(assets, {
+    get(target, property) {
+      if (property === Symbol.iterator || property === "map") {
+        throw new Error("blocked traversal");
+      }
+      return target[property];
+    },
+  });
+  const container = new FakeNode("section");
+
+  assert.doesNotThrow(() => renderManualAssets(container, collection, { dom }));
+  assert.equal(flattenText(container).includes("ETH"), true);
 });
 
 test("index exposes tab, progress, and backtest form accessibility contracts", async () => {

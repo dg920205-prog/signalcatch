@@ -1,4 +1,4 @@
-import { safeText } from "./dom.js";
+import { safeText, snapshotArray } from "./dom.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -36,10 +36,11 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
   if (safeText(error)) {
     dom.append(card, dom.el("p", { class: "error-text" }, safeText(error)));
   }
-  if (Array.isArray(diagnostics) && diagnostics.length) {
+  const diagnosticItems = snapshotArray(diagnostics, 20).values;
+  if (diagnosticItems.length) {
     dom.append(card, dom.el("details", { class: "diagnostics" },
       dom.el("summary", {}, "Diagnostics"),
-      dom.el("ul", {}, diagnostics.map((item) => renderDiagnostic(item, dom))),
+      dom.el("ul", {}, diagnosticItems.map((item) => renderDiagnostic(item, dom))),
     ));
   }
 
@@ -49,11 +50,12 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
 
 export function renderManualAssets(container, assets = [], options) {
   options.dom.clear(container);
-  if (assets.length === 0) {
+  const items = snapshotArray(assets).values;
+  if (items.length === 0) {
     options.dom.append(container, options.dom.el("p", { class: "empty-state" }, "Add a symbol to begin monitoring."));
     return;
   }
-  for (const asset of assets) {
+  for (const asset of items) {
     renderManualAssetCard(container, asset, options);
   }
 }

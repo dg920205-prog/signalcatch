@@ -16,6 +16,33 @@ export function safeText(value, fallback = "") {
   ) ? value : fallback;
 }
 
+export function snapshotArray(value, limit = 500, { strict = false } = {}) {
+  try {
+    if (!Array.isArray(value)) {
+      return { ok: false, values: [] };
+    }
+
+    const length = value.length;
+    if (!Number.isSafeInteger(length) || length < 0) {
+      return { ok: false, values: [] };
+    }
+
+    const values = [];
+    for (let index = 0; index < Math.min(length, limit); index += 1) {
+      try {
+        values.push(value[index]);
+      } catch {
+        if (strict) {
+          return { ok: false, values: [] };
+        }
+      }
+    }
+    return { ok: true, truncated: length > limit, values };
+  } catch {
+    return { ok: false, values: [] };
+  }
+}
+
 export function createDom(documentRef = globalThis.document) {
   if (!documentRef?.createElement || !documentRef?.createTextNode) {
     throw new TypeError("A document implementation is required.");

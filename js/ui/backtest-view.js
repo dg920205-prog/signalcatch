@@ -1,17 +1,36 @@
 import { tradesToCsv } from "../backtest/csv.js";
 import { BACKTEST_DEFAULTS, MODE_CONFIG } from "../config.js";
 import { normalizeBaseSymbol } from "../core/symbols.js";
-import { safeText } from "./dom.js";
+import { safeText, snapshotArray } from "./dom.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 const DEFAULT_WAITS = Object.fromEntries(MODES.map((mode) => [mode, MODE_CONFIG[mode].waitCandles]));
 const DECIMAL = /^-?(?:\d+(?:\.\d*)?|\.\d+)$/;
+const INVALID_SETTINGS = "잘못된 백테스트 설정입니다.";
 
 function safeRead(value, key, fallback) {
   try {
     return value?.[key] ?? fallback;
   } catch {
     return fallback;
+  }
+}
+
+function readSetting(value, key, fallback) {
+  try {
+    if (value === null || value === undefined) {
+      return fallback;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(Object(value), key);
+    if (!descriptor) {
+      return fallback;
+    }
+    if (!Object.hasOwn(descriptor, "value")) {
+      throw new Error(INVALID_SETTINGS);
+    }
+    return descriptor.value ?? fallback;
+  } catch {
+    throw new Error(INVALID_SETTINGS);
   }
 }
 
@@ -52,46 +71,62 @@ function validDate(value) {
 }
 
 function normalizeSymbols(values) {
-  if (!Array.isArray(values)) return [];
+  const snapshot = snapshotArray(values, 100, { strict: true });
+  if (!snapshot.ok || snapshot.truncated) throw new Error(INVALID_SETTINGS);
   const symbols = [];
-  for (const value of values) {
+  const seen = new Set();
+  for (const value of snapshot.values) {
     try {
-      symbols.push(normalizeBaseSymbol(value));
+      const symbol = normalizeBaseSymbol(value);
+      if (!seen.has(symbol)) {
+        seen.add(symbol);
+        symbols.push(symbol);
+      }
     } catch {
       // Invalid UI selections are excluded from the request boundary.
     }
   }
-  return [...new Set(symbols)];
+  return symbols;
 }
 
 export function buildBacktestRequest(formState = {}) {
-  const available = new Set(normalizeSymbols(safeRead(formState, "symbols", [])));
-  const symbols = normalizeSymbols(safeRead(formState, "selected", []))
-    .filter((symbol) => available.has(symbol));
-  const modes = formState.modes ?? MODES;
-  const startDate = formState.startDate;
-  const endDate = formState.endDate;
-  const waits = { ...DEFAULT_WAITS, ...(formState.waitCandles ?? {}) };
+  try {
+    const available = new Set(normalizeSymbols(readSetting(formState, "symbols", [])));
+    const symbols = normalizeSymbols(readSetting(formState, "selected", []))
+      .filter((symbol) => available.has(symbol));
+    const modesSnapshot = snapshotArray(readSetting(formState, "modes", MODES), MODES.length, { strict: true });
+    const modes = modesSnapshot.values;
+    const startDate = readSetting(formState, "startDate");
+    const endDate = readSetting(formState, "endDate");
+    const waitSettings = readSetting(formState, "waitCandles");
+    const waits = {};
 
-  if (symbols.length === 0) throw new TypeError("At least one symbol is required.");
-  if (!Array.isArray(modes) || modes.length === 0 || modes.some((mode) => !MODES.includes(mode))) throw new TypeError("Invalid mode.");
-  if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new TypeError("Invalid date range.");
-  for (const mode of MODES) {
-    waits[mode] = validWait(safeRead(waits, mode));
+    if (symbols.length === 0) throw new Error(INVALID_SETTINGS);
+    if (!modesSnapshot.ok || modesSnapshot.truncated || modes.length === 0) throw new Error(INVALID_SETTINGS);
+    for (const mode of modes) {
+      if (!MODES.includes(mode)) throw new Error(INVALID_SETTINGS);
+    }
+    if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error(INVALID_SETTINGS);
+    if (waitSettings !== undefined && (waitSettings === null || typeof waitSettings !== "object")) throw new Error(INVALID_SETTINGS);
+    for (const mode of MODES) {
+      waits[mode] = validWait(readSetting(waitSettings, mode, DEFAULT_WAITS[mode]));
+    }
+    const roundTripFeePct = validCost(readSetting(formState, "roundTripFeePct", BACKTEST_DEFAULTS.roundTripFeePct), "fee");
+    const roundTripSlippagePct = validCost(readSetting(formState, "roundTripSlippagePct", BACKTEST_DEFAULTS.roundTripSlippagePct), "slippage");
+    if (roundTripFeePct + roundTripSlippagePct > 10) throw new Error(INVALID_SETTINGS);
+
+    return {
+      symbols,
+      modes,
+      startDate,
+      endDate,
+      roundTripFeePct,
+      roundTripSlippagePct,
+      waitCandles: waits,
+    };
+  } catch {
+    throw new Error(INVALID_SETTINGS);
   }
-  const roundTripFeePct = validCost(formState.roundTripFeePct ?? BACKTEST_DEFAULTS.roundTripFeePct, "fee");
-  const roundTripSlippagePct = validCost(formState.roundTripSlippagePct ?? BACKTEST_DEFAULTS.roundTripSlippagePct, "slippage");
-  if (roundTripFeePct + roundTripSlippagePct > 10) throw new TypeError("Invalid combined cost.");
-
-  return {
-    symbols,
-    modes: [...modes],
-    startDate,
-    endDate,
-    roundTripFeePct,
-    roundTripSlippagePct,
-    waitCandles: waits,
-  };
 }
 
 export function renderBacktestMetrics(container, metrics = {}, { dom }) {
@@ -107,7 +142,7 @@ export function renderBacktestMetrics(container, metrics = {}, { dom }) {
 export function renderTrades(container, trades = [], { dom }) {
   dom.clear(container);
   const body = dom.el("tbody");
-  for (const trade of trades) {
+  for (const trade of snapshotArray(trades).values) {
     dom.append(body, dom.el("tr", {}, ...["symbol", "mode", "status", "outcome", "pnlPct", "holdCandles"].map((key) => dom.el("td", {}, safeText(safeRead(trade, key), "-")))));
   }
   dom.append(container, dom.el("table", { class: "data-table" },
@@ -115,6 +150,8 @@ export function renderTrades(container, trades = [], { dom }) {
     body,
   ));
 }
+
+export const renderBacktestResults = renderTrades;
 
 export function exportBacktestCsv(trades = []) {
   return tradesToCsv(trades);

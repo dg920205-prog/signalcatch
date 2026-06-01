@@ -1,4 +1,4 @@
-import { safeText } from "./dom.js";
+import { safeText, snapshotArray } from "./dom.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -13,7 +13,7 @@ function safeRead(value, key, fallback) {
 export function renderScannerResults(container, candidates = [], { dom }) {
   dom.clear(container);
   const body = dom.el("tbody");
-  for (const candidate of candidates) {
+  for (const candidate of snapshotArray(candidates).values) {
     const modeResults = safeRead(candidate, "modeResults", {});
     dom.append(body, dom.el("tr", {},
       dom.el("td", {}, safeText(safeRead(candidate, "symbol"), "Unknown")),
