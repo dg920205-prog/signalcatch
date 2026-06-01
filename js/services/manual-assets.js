@@ -66,19 +66,41 @@ function exchangeName(input) {
 
 export function createManualAssetService(adapters) {
   const assets = new Map();
+  const inFlight = new Map();
 
-  async function load(asset) {
-    const adapter = safeRead(adapters, asset.exchange.toLowerCase());
+  function load(asset) {
+    const activeRequest = inFlight.get(asset.id);
 
-    if (!adapter) {
-      throw new Error("Missing exchange adapter.");
+    if (activeRequest) {
+      return activeRequest;
     }
 
+    const request = performLoad(asset).finally(() => {
+      if (inFlight.get(asset.id) === request) {
+        inFlight.delete(asset.id);
+      }
+    });
+
+    inFlight.set(asset.id, request);
+    return request;
+  }
+
+  async function performLoad(asset) {
+    const adapter = safeRead(adapters, asset.exchange.toLowerCase());
     const version = asset.version + 1;
     asset.version = version;
     asset.status = "loading";
     asset.error = null;
     asset.diagnostics = [];
+
+    if (!adapter) {
+      asset.status = "error";
+      asset.error = "Some asset data could not be loaded.";
+      asset.diagnostics = [
+        { kind: "configuration", operation: "loadAsset" },
+      ];
+      return clone(asset);
+    }
 
     const [tickerResult, candlesResult] = await Promise.allSettled([
       Promise.resolve().then(() => adapter.fetchTicker(asset.symbol)),

@@ -109,7 +109,12 @@ export function createScannerService({
   analyze = analyzeCandles,
   signalClassify = classifyModes,
 }) {
-  if (!bybit || !Number.isInteger(concurrency) || concurrency < 1) {
+  if (
+    !bybit ||
+    !Number.isInteger(concurrency) ||
+    concurrency < 1 ||
+    concurrency > 10
+  ) {
     throw new Error("Invalid scanner configuration.");
   }
 

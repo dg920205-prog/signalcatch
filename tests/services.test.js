@@ -151,9 +151,8 @@ test("manual assets reject duplicates, remove cards, refresh cards, and allow Bi
   );
 });
 
-test("manual asset discards stale refresh results that finish out of order", async () => {
+test("manual asset merges concurrent refresh promises", async () => {
   const first = deferred();
-  const second = deferred();
   let refreshCount = 0;
   const service = createManualAssetService(
     adapters({
@@ -165,21 +164,20 @@ test("manual asset discards stale refresh results that finish out of order", asy
             return { symbol: `${symbol}USDT`, price: 1 };
           }
 
-          return refreshCount === 2 ? first.promise : second.promise;
+          return first.promise;
         },
       },
     }),
   );
   const added = await service.add({ symbol: "btc", exchange: "bybit" });
-  const stale = service.refresh(added.id);
-  const current = service.refresh(added.id);
+  const firstRefresh = service.refresh(added.id);
+  const secondRefresh = service.refresh(added.id);
 
-  second.resolve({ symbol: "BTCUSDT", price: 3 });
-  await current;
   first.resolve({ symbol: "BTCUSDT", price: 2 });
-  await stale;
+  await Promise.all([firstRefresh, secondRefresh]);
 
-  assert.equal(service.list()[0].ticker.price, 3);
+  assert.equal(refreshCount, 2);
+  assert.equal(service.list()[0].ticker.price, 2);
 });
 
 test("manual asset does not return or restore a removed card after pending load", async () => {
@@ -253,6 +251,55 @@ test("manual asset diagnostics tolerate throwing detail getters and proxies", as
   assert.equal(second.status, "error");
   assert.equal(first.error, "Some asset data could not be loaded.");
   assert.equal(second.error, "Some asset data could not be loaded.");
+});
+
+test("manual asset merges repeated refresh calls while a request is in flight", async () => {
+  const ticker = deferred();
+  const candles = deferred();
+  let tickerCalls = 0;
+  let candleCalls = 0;
+  const service = createManualAssetService(
+    adapters({
+      bybit: {
+        fetchTicker: async () => {
+          tickerCalls += 1;
+          return ticker.promise;
+        },
+        fetchCandles: async () => {
+          candleCalls += 1;
+          return candles.promise;
+        },
+      },
+    }),
+  );
+  const pending = service.add({ symbol: "btc", exchange: "bybit" });
+  const { id } = service.list()[0];
+  const refreshes = Array.from({ length: 100 }, () => service.refresh(id));
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(tickerCalls, 1);
+  assert.equal(candleCalls, 1);
+
+  ticker.resolve({ symbol: "BTCUSDT", price: 1 });
+  candles.resolve(trendingCandles(100, 2));
+  await Promise.all([pending, ...refreshes]);
+});
+
+test("manual asset keeps a visible error card when its adapter is missing", async () => {
+  const service = createManualAssetService({});
+
+  const asset = await service.add({ symbol: "btc", exchange: "bybit" });
+
+  assert.equal(asset.visible, true);
+  assert.equal(asset.status, "error");
+  assert.equal(asset.error, "Some asset data could not be loaded.");
+  assert.equal(asset.diagnostics.length, 1);
+  assert.equal(service.list()[0].status, "error");
+
+  const refreshed = await service.refresh(asset.id);
+
+  assert.equal(refreshed.status, "error");
+  assert.equal(refreshed.error, "Some asset data could not be loaded.");
 });
 
 test("market regime is neutral with insufficient data", () => {
@@ -332,6 +379,17 @@ test("scanner caps concurrency, normalizes duplicates, limits symbols, and repor
       [1, 2],
       [2, 2],
     ],
+  );
+});
+
+test("scanner rejects unsafe concurrency fanout", () => {
+  assert.throws(
+    () =>
+      createScannerService({
+        concurrency: 999999,
+        bybit: { fetchCandles: async () => trendingCandles(100, 2) },
+      }),
+    /configuration/i,
   );
 });
 
