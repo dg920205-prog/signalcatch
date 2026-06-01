@@ -218,6 +218,133 @@ test("load and save discard prototype pollution keys", () => {
   });
 });
 
+test("save snapshots getter values before validating and persisting them", () => {
+  function changingGetter(name, first, second) {
+    let reads = 0;
+    return {
+      get() {
+        reads += 1;
+        const count = reads;
+        snapshots.set(name, count);
+        return reads === 1 ? first : second;
+      },
+    };
+  }
+
+  const snapshots = new Map();
+  const backend = createMemoryStorage();
+  const storage = createStorage(backend);
+  const settings = {};
+  const asset = {};
+  const ui = {};
+  const backtestDefaults = {};
+  const waitCandles = {};
+
+  Object.defineProperties(settings, {
+    persist: changingGetter("persist", true, false),
+    manualAssets: changingGetter("manualAssets", [asset], []),
+    ui: changingGetter("ui", ui, {}),
+    backtestDefaults: changingGetter("backtestDefaults", backtestDefaults, {}),
+  });
+  Object.defineProperties(asset, {
+    symbol: changingGetter("symbol", "btcusdt", "<bad>"),
+    exchange: changingGetter("exchange", "bybit", "other"),
+  });
+  Object.defineProperties(ui, {
+    activeTab: changingGetter("activeTab", "scanner", "invalid"),
+    selectedMode: changingGetter("selectedMode", "day", "invalid"),
+    theme: changingGetter("theme", "navy", "light"),
+  });
+  Object.defineProperties(backtestDefaults, {
+    presetDays: changingGetter("presetDays", 30, 0),
+    roundTripFeePct: changingGetter("roundTripFeePct", 0.11, 11),
+    roundTripSlippagePct: changingGetter("roundTripSlippagePct", 0.2, -1),
+    waitCandles: changingGetter("waitCandles", waitCandles, {}),
+  });
+  Object.defineProperties(waitCandles, {
+    common: changingGetter("common", 8, 0),
+  });
+
+  storage.save(settings);
+
+  assert.deepEqual(JSON.parse(backend.snapshot()[STORAGE_KEY]), {
+    persist: true,
+    manualAssets: [{ symbol: "BTC", exchange: "bybit" }],
+    ui: { activeTab: "scanner", selectedMode: "day", theme: "navy" },
+    backtestDefaults: {
+      presetDays: 30,
+      roundTripFeePct: 0.11,
+      roundTripSlippagePct: 0.2,
+      waitCandles: { common: 8 },
+    },
+  });
+  assert.deepEqual(Object.fromEntries(snapshots), {
+    persist: 1,
+    manualAssets: 1,
+    ui: 1,
+    backtestDefaults: 1,
+    symbol: 1,
+    exchange: 1,
+    activeTab: 1,
+    selectedMode: 1,
+    theme: 1,
+    presetDays: 1,
+    roundTripFeePct: 1,
+    roundTripSlippagePct: 1,
+    waitCandles: 1,
+    common: 1,
+  });
+});
+
+test("save ignores throwing field getters while preserving other safe values", () => {
+  const throwingGetter = {
+    get() {
+      throw new Error("blocked");
+    },
+  };
+  const backend = createMemoryStorage();
+  const storage = createStorage(backend);
+  const badAsset = { exchange: "bybit" };
+  const ui = { activeTab: "manual", theme: "navy" };
+
+  Object.defineProperty(badAsset, "symbol", throwingGetter);
+  Object.defineProperty(ui, "selectedMode", throwingGetter);
+
+  storage.save({
+    persist: true,
+    manualAssets: [badAsset, { symbol: "eth", exchange: "binance" }],
+    ui,
+    backtestDefaults: {
+      presetDays: 7,
+      roundTripFeePct: 0.1,
+      roundTripSlippagePct: 0.2,
+      waitCandles: new Proxy(
+        { common: 8, swing: 4 },
+        {
+          get(target, property) {
+            if (property === "swing") {
+              throw new Error("blocked");
+            }
+            return target[property];
+          },
+        },
+      ),
+    },
+  });
+
+  assert.deepEqual(JSON.parse(backend.snapshot()[STORAGE_KEY]), {
+    persist: true,
+    manualAssets: [{ symbol: "ETH", exchange: "binance" }],
+    ui: { activeTab: "manual", theme: "navy" },
+    backtestDefaults: {
+      presetDays: 7,
+      roundTripFeePct: 0.1,
+      roundTripSlippagePct: 0.2,
+      waitCandles: { common: 8 },
+    },
+  });
+});
+
 test("clear removes saved settings", () => {
   const backend = createMemoryStorage({ [STORAGE_KEY]: '{"persist":true}' });
 

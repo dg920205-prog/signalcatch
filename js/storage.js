@@ -25,6 +25,14 @@ function isNumberInRange(value, minimum, maximum) {
   );
 }
 
+function readCandidate(object, property) {
+  try {
+    return { ok: true, value: object[property] };
+  } catch {
+    return { ok: false };
+  }
+}
+
 function sanitizeManualAssets(manualAssets) {
   if (!Array.isArray(manualAssets)) {
     return [];
@@ -37,19 +45,26 @@ function sanitizeManualAssets(manualAssets) {
     if (
       sanitized.length >= 100 ||
       !asset ||
-      typeof asset !== "object" ||
-      !EXCHANGES.has(asset.exchange)
+      typeof asset !== "object"
     ) {
       continue;
     }
 
     try {
-      const symbol = normalizeBaseSymbol(asset.symbol);
-      const key = `${asset.exchange}:${symbol}`;
+      const symbolCandidate = readCandidate(asset, "symbol");
+      const exchangeCandidate = readCandidate(asset, "exchange");
+
+      if (!symbolCandidate.ok || !exchangeCandidate.ok || !EXCHANGES.has(exchangeCandidate.value)) {
+        continue;
+      }
+
+      const symbol = normalizeBaseSymbol(symbolCandidate.value);
+      const exchange = exchangeCandidate.value;
+      const key = `${exchange}:${symbol}`;
 
       if (!seen.has(key)) {
         seen.add(key);
-        sanitized.push({ symbol, exchange: asset.exchange });
+        sanitized.push({ symbol, exchange });
       }
     } catch {
       // Ignore invalid user-entered symbols while restoring preferences.
@@ -66,14 +81,18 @@ function sanitizeUi(ui) {
     return sanitized;
   }
 
-  if (ACTIVE_TABS.has(ui.activeTab)) {
-    sanitized.activeTab = ui.activeTab;
+  const activeTab = readCandidate(ui, "activeTab");
+  const selectedMode = readCandidate(ui, "selectedMode");
+  const theme = readCandidate(ui, "theme");
+
+  if (activeTab.ok && ACTIVE_TABS.has(activeTab.value)) {
+    sanitized.activeTab = activeTab.value;
   }
-  if (MODES.has(ui.selectedMode)) {
-    sanitized.selectedMode = ui.selectedMode;
+  if (selectedMode.ok && MODES.has(selectedMode.value)) {
+    sanitized.selectedMode = selectedMode.value;
   }
-  if (ui.theme === "navy") {
-    sanitized.theme = ui.theme;
+  if (theme.ok && theme.value === "navy") {
+    sanitized.theme = theme.value;
   }
 
   return sanitized;
@@ -86,44 +105,64 @@ function sanitizeBacktestDefaults(backtestDefaults) {
     return sanitized;
   }
 
+  const presetDays = readCandidate(backtestDefaults, "presetDays");
+  const roundTripFeePct = readCandidate(backtestDefaults, "roundTripFeePct");
+  const roundTripSlippagePct = readCandidate(backtestDefaults, "roundTripSlippagePct");
+  const waitCandles = readCandidate(backtestDefaults, "waitCandles");
+
   if (
-    Number.isSafeInteger(backtestDefaults.presetDays) &&
-    isNumberInRange(backtestDefaults.presetDays, 1, 365)
+    presetDays.ok &&
+    Number.isSafeInteger(presetDays.value) &&
+    isNumberInRange(presetDays.value, 1, 365)
   ) {
-    sanitized.presetDays = backtestDefaults.presetDays;
+    sanitized.presetDays = presetDays.value;
   }
-  if (isNumberInRange(backtestDefaults.roundTripFeePct, 0, 10)) {
-    sanitized.roundTripFeePct = backtestDefaults.roundTripFeePct;
+  if (roundTripFeePct.ok && isNumberInRange(roundTripFeePct.value, 0, 10)) {
+    sanitized.roundTripFeePct = roundTripFeePct.value;
   }
-  if (isNumberInRange(backtestDefaults.roundTripSlippagePct, 0, 10)) {
-    sanitized.roundTripSlippagePct = backtestDefaults.roundTripSlippagePct;
+  if (roundTripSlippagePct.ok && isNumberInRange(roundTripSlippagePct.value, 0, 10)) {
+    sanitized.roundTripSlippagePct = roundTripSlippagePct.value;
   }
 
-  const waitCandles = backtestDefaults.waitCandles;
-  if (!waitCandles || typeof waitCandles !== "object") {
+  if (!waitCandles.ok || !waitCandles.value || typeof waitCandles.value !== "object") {
     return sanitized;
   }
 
   for (const mode of MODES) {
-    const value = waitCandles[mode];
-    if (Number.isSafeInteger(value) && isNumberInRange(value, 1, 500)) {
-      sanitized.waitCandles[mode] = value;
+    const candidate = readCandidate(waitCandles.value, mode);
+    if (
+      candidate.ok &&
+      Number.isSafeInteger(candidate.value) &&
+      isNumberInRange(candidate.value, 1, 500)
+    ) {
+      sanitized.waitCandles[mode] = candidate.value;
     }
   }
 
   return sanitized;
 }
 
-function sanitizeSettings(settings) {
-  if (!settings || typeof settings !== "object" || settings.persist !== true) {
+function sanitizeSettings(settings, persistCandidate = readCandidate(settings, "persist")) {
+  if (
+    !settings ||
+    typeof settings !== "object" ||
+    !persistCandidate.ok ||
+    persistCandidate.value !== true
+  ) {
     return createSafeDefaults();
   }
 
+  const manualAssets = readCandidate(settings, "manualAssets");
+  const ui = readCandidate(settings, "ui");
+  const backtestDefaults = readCandidate(settings, "backtestDefaults");
+
   return {
     persist: true,
-    manualAssets: sanitizeManualAssets(settings.manualAssets),
-    ui: sanitizeUi(settings.ui),
-    backtestDefaults: sanitizeBacktestDefaults(settings.backtestDefaults),
+    manualAssets: sanitizeManualAssets(manualAssets.ok ? manualAssets.value : undefined),
+    ui: sanitizeUi(ui.ok ? ui.value : undefined),
+    backtestDefaults: sanitizeBacktestDefaults(
+      backtestDefaults.ok ? backtestDefaults.value : undefined,
+    ),
   };
 }
 
@@ -140,12 +179,13 @@ export function createStorage(backend) {
 
     save(settings) {
       try {
-        if (!settings || settings.persist !== true) {
+        const persistCandidate = readCandidate(settings, "persist");
+        if (!settings || !persistCandidate.ok || persistCandidate.value !== true) {
           backend.removeItem(STORAGE_KEY);
           return;
         }
 
-        backend.setItem(STORAGE_KEY, JSON.stringify(sanitizeSettings(settings)));
+        backend.setItem(STORAGE_KEY, JSON.stringify(sanitizeSettings(settings, persistCandidate)));
       } catch {
         // Persistence failures must not interrupt the dashboard.
       }
