@@ -197,6 +197,52 @@ test("manual asset does not return or restore a removed card after pending load"
   assert.equal(result === null || ["removed", "stale"].includes(result.status), true);
 });
 
+test("manual asset detaches removed in-flight requests before re-adding the same id", async () => {
+  const oldTicker = deferred();
+  const oldCandles = deferred();
+  const newTicker = deferred();
+  const newCandles = deferred();
+  let tickerCalls = 0;
+  let candleCalls = 0;
+  const service = createManualAssetService(
+    adapters({
+      bybit: {
+        fetchTicker: async () => {
+          tickerCalls += 1;
+          return tickerCalls === 1 ? oldTicker.promise : newTicker.promise;
+        },
+        fetchCandles: async () => {
+          candleCalls += 1;
+          return candleCalls === 1 ? oldCandles.promise : newCandles.promise;
+        },
+      },
+    }),
+  );
+  const oldPending = service.add({ symbol: "btc", exchange: "bybit" });
+  const { id } = service.list()[0];
+
+  assert.equal(service.remove(id), true);
+
+  const newPending = service.add({ symbol: "btc", exchange: "bybit" });
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(tickerCalls, 2);
+  assert.equal(candleCalls, 2);
+
+  oldTicker.resolve({ symbol: "BTCUSDT", price: 1 });
+  oldCandles.resolve(trendingCandles(100, 1));
+  assert.equal(await oldPending, null);
+
+  newTicker.resolve({ symbol: "BTCUSDT", price: 2 });
+  newCandles.resolve(trendingCandles(100, 2));
+  const asset = await newPending;
+
+  assert.equal(asset.status, "ready");
+  assert.equal(asset.ticker.price, 2);
+  assert.equal(service.list()[0].status, "ready");
+  assert.equal(service.list()[0].ticker.price, 2);
+});
+
 test("manual asset converts synchronous adapter throws into diagnostics", async () => {
   const service = createManualAssetService(
     adapters({

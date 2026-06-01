@@ -71,17 +71,19 @@ export function createManualAssetService(adapters) {
   function load(asset) {
     const activeRequest = inFlight.get(asset.id);
 
-    if (activeRequest) {
-      return activeRequest;
+    if (activeRequest?.asset === asset) {
+      return activeRequest.promise;
     }
 
     const request = performLoad(asset).finally(() => {
-      if (inFlight.get(asset.id) === request) {
+      const currentRequest = inFlight.get(asset.id);
+
+      if (currentRequest?.asset === asset && currentRequest.promise === request) {
         inFlight.delete(asset.id);
       }
     });
 
-    inFlight.set(asset.id, request);
+    inFlight.set(asset.id, { asset, promise: request });
     return request;
   }
 
@@ -181,7 +183,19 @@ export function createManualAssetService(adapters) {
     },
 
     remove(id) {
-      return assets.delete(id);
+      const asset = assets.get(id);
+
+      if (!asset) {
+        return false;
+      }
+
+      assets.delete(id);
+
+      if (inFlight.get(id)?.asset === asset) {
+        inFlight.delete(id);
+      }
+
+      return true;
     },
 
     list() {
