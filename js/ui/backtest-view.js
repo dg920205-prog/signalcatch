@@ -4,7 +4,9 @@ import { normalizeBaseSymbol } from "../core/symbols.js";
 import { safeText, snapshotArray } from "./dom.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
-const DEFAULT_WAITS = Object.fromEntries(MODES.map((mode) => [mode, MODE_CONFIG[mode].waitCandles]));
+const DEFAULT_WAITS = Object.fromEntries(
+  MODES.map((mode) => [mode, MODE_CONFIG[mode].waitCandles]),
+);
 const DECIMAL = /^-?(?:\d+(?:\.\d*)?|\.\d+)$/;
 const INVALID_SETTINGS = "잘못된 백테스트 설정입니다.";
 
@@ -65,9 +67,11 @@ function validDate(value) {
   if (!match) return false;
   const [, year, month, day] = match;
   const date = new Date(`${value}T00:00:00Z`);
-  return date.getUTCFullYear() === Number(year) &&
+  return (
+    date.getUTCFullYear() === Number(year) &&
     date.getUTCMonth() + 1 === Number(month) &&
-    date.getUTCDate() === Number(day);
+    date.getUTCDate() === Number(day)
+  );
 }
 
 function normalizeSymbols(values) {
@@ -83,7 +87,7 @@ function normalizeSymbols(values) {
         symbols.push(symbol);
       }
     } catch {
-      // Invalid UI selections are excluded from the request boundary.
+      // Exclude invalid symbols from requests.
     }
   }
   return symbols;
@@ -91,10 +95,17 @@ function normalizeSymbols(values) {
 
 export function buildBacktestRequest(formState = {}) {
   try {
-    const available = new Set(normalizeSymbols(readSetting(formState, "symbols", [])));
-    const symbols = normalizeSymbols(readSetting(formState, "selected", []))
-      .filter((symbol) => available.has(symbol));
-    const modesSnapshot = snapshotArray(readSetting(formState, "modes", MODES), MODES.length, { strict: true });
+    const available = new Set(
+      normalizeSymbols(readSetting(formState, "symbols", [])),
+    );
+    const symbols = normalizeSymbols(readSetting(formState, "selected", [])).filter(
+      (symbol) => available.has(symbol),
+    );
+    const modesSnapshot = snapshotArray(
+      readSetting(formState, "modes", MODES),
+      MODES.length,
+      { strict: true },
+    );
     const modes = modesSnapshot.values;
     const startDate = readSetting(formState, "startDate");
     const endDate = readSetting(formState, "endDate");
@@ -102,18 +113,36 @@ export function buildBacktestRequest(formState = {}) {
     const waits = {};
 
     if (symbols.length === 0) throw new Error(INVALID_SETTINGS);
-    if (!modesSnapshot.ok || modesSnapshot.truncated || modes.length === 0) throw new Error(INVALID_SETTINGS);
+    if (!modesSnapshot.ok || modesSnapshot.truncated || modes.length === 0)
+      throw new Error(INVALID_SETTINGS);
     for (const mode of modes) {
       if (!MODES.includes(mode)) throw new Error(INVALID_SETTINGS);
     }
-    if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error(INVALID_SETTINGS);
-    if (waitSettings !== undefined && (waitSettings === null || typeof waitSettings !== "object")) throw new Error(INVALID_SETTINGS);
+    if (!validDate(startDate) || !validDate(endDate) || startDate > endDate)
+      throw new Error(INVALID_SETTINGS);
+    if (
+      waitSettings !== undefined &&
+      (waitSettings === null || typeof waitSettings !== "object")
+    ) {
+      throw new Error(INVALID_SETTINGS);
+    }
     for (const mode of MODES) {
       waits[mode] = validWait(readSetting(waitSettings, mode, DEFAULT_WAITS[mode]));
     }
-    const roundTripFeePct = validCost(readSetting(formState, "roundTripFeePct", BACKTEST_DEFAULTS.roundTripFeePct), "fee");
-    const roundTripSlippagePct = validCost(readSetting(formState, "roundTripSlippagePct", BACKTEST_DEFAULTS.roundTripSlippagePct), "slippage");
-    if (roundTripFeePct + roundTripSlippagePct > 10) throw new Error(INVALID_SETTINGS);
+    const roundTripFeePct = validCost(
+      readSetting(formState, "roundTripFeePct", BACKTEST_DEFAULTS.roundTripFeePct),
+      "fee",
+    );
+    const roundTripSlippagePct = validCost(
+      readSetting(
+        formState,
+        "roundTripSlippagePct",
+        BACKTEST_DEFAULTS.roundTripSlippagePct,
+      ),
+      "slippage",
+    );
+    if (roundTripFeePct + roundTripSlippagePct > 10)
+      throw new Error(INVALID_SETTINGS);
 
     return {
       symbols,
@@ -129,26 +158,129 @@ export function buildBacktestRequest(formState = {}) {
   }
 }
 
+export function renderExecutionCard(container, run = {}, { dom }) {
+  dom.clear(container);
+  const entries = [
+    ["기간", `${safeText(run.startDate, "-")} ~ ${safeText(run.endDate, "-")}`],
+    ["심볼", safeText(run.symbolsText, "-")],
+    ["모드", safeText(run.modesText, "-")],
+    ["데이터 소스", safeText(run.dataSource, "Bybit 기준 임시 산정")],
+    ["OOS", safeText(run.oosLabel, "미적용")],
+  ];
+  dom.append(
+    container,
+    entries.map(([label, value]) =>
+      dom.el(
+        "div",
+        { class: "metric-card" },
+        dom.el("span", { class: "muted" }, label),
+        dom.el("strong", {}, value),
+      ),
+    ),
+  );
+}
+
 export function renderBacktestMetrics(container, metrics = {}, { dom }) {
   dom.clear(container);
   const entries = [
-    ["Closed trades", safeText(safeRead(metrics, "closedTrades"), 0)], ["Win rate", `${safeText(safeRead(metrics, "winRatePct"), 0)}%`],
-    ["Return", `${safeText(safeRead(metrics, "compoundedReturnPct"), 0)}%`], ["Max drawdown", `${safeText(safeRead(metrics, "maxDrawdownPct"), 0)}%`],
-    ["Expectancy", `${safeText(safeRead(metrics, "expectancyPct"), 0)}%`], ["Profit factor", safeText(safeRead(metrics, "profitFactor"), 0)],
+    ["Closed trades", safeText(safeRead(metrics, "closedTrades"), 0)],
+    ["Win rate", `${safeText(safeRead(metrics, "winRatePct"), 0)}%`],
+    ["Return", `${safeText(safeRead(metrics, "compoundedReturnPct"), 0)}%`],
+    ["Max drawdown", `${safeText(safeRead(metrics, "maxDrawdownPct"), 0)}%`],
+    ["Expectancy", `${safeText(safeRead(metrics, "expectancyPct"), 0)}%`],
+    ["Profit factor", safeText(safeRead(metrics, "profitFactor"), 0)],
   ];
-  dom.append(container, entries.map(([label, value]) => dom.el("article", { class: "metric-card" }, dom.el("span", { class: "muted" }, label), dom.el("strong", {}, value))));
+  dom.append(
+    container,
+    entries.map(([label, value]) =>
+      dom.el(
+        "article",
+        { class: "metric-card" },
+        dom.el("span", { class: "muted" }, label),
+        dom.el("strong", {}, value),
+      ),
+    ),
+  );
+}
+
+function renderGrouped(container, grouped = {}, { dom }) {
+  dom.clear(container);
+  const body = dom.el("tbody");
+  for (const [key, summary] of Object.entries(grouped)) {
+    dom.append(
+      body,
+      dom.el(
+        "tr",
+        {},
+        dom.el("td", {}, safeText(key, "-")),
+        dom.el("td", {}, `${safeText(summary.closedTrades, 0)}`),
+        dom.el("td", {}, `${safeText(summary.winRatePct, 0)}%`),
+        dom.el("td", {}, `${safeText(summary.compoundedReturnPct, 0)}%`),
+      ),
+    );
+  }
+  dom.append(
+    container,
+    dom.el(
+      "table",
+      { class: "data-table" },
+      dom.el(
+        "thead",
+        {},
+        dom.el(
+          "tr",
+          {},
+          ...["Key", "Closed", "Win Rate", "Return"]
+            .map((label) => dom.el("th", {}, label)),
+        ),
+      ),
+      body,
+    ),
+  );
+}
+
+export function renderGroupedBySymbol(container, grouped = {}, options) {
+  renderGrouped(container, grouped, options);
+}
+
+export function renderGroupedByMode(container, grouped = {}, options) {
+  renderGrouped(container, grouped, options);
 }
 
 export function renderTrades(container, trades = [], { dom }) {
   dom.clear(container);
   const body = dom.el("tbody");
   for (const trade of snapshotArray(trades).values) {
-    dom.append(body, dom.el("tr", {}, ...["symbol", "mode", "status", "outcome", "pnlPct", "holdCandles"].map((key) => dom.el("td", {}, safeText(safeRead(trade, key), "-")))));
+    dom.append(
+      body,
+      dom.el(
+        "tr",
+        {},
+        ...["symbol", "mode", "status", "outcome", "pnlPct", "holdCandles"].map(
+          (key) => dom.el("td", {}, safeText(safeRead(trade, key), "-")),
+        ),
+      ),
+    );
   }
-  dom.append(container, dom.el("table", { class: "data-table" },
-    dom.el("thead", {}, dom.el("tr", {}, ...["Symbol", "Mode", "Status", "Outcome", "PnL %", "Hold"].map((label) => dom.el("th", {}, label)))),
-    body,
-  ));
+  dom.append(
+    container,
+    dom.el(
+      "table",
+      { class: "data-table" },
+      dom.el(
+        "thead",
+        {},
+        dom.el(
+          "tr",
+          {},
+          ...["Symbol", "Mode", "Status", "Outcome", "PnL %", "Hold"].map((label) =>
+            dom.el("th", {}, label),
+          ),
+        ),
+      ),
+      body,
+    ),
+  );
 }
 
 export const renderBacktestResults = renderTrades;

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com https://api.coingecko.com; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>SignalCatch Dashboard</title>
     <link rel="stylesheet" href="css/styles.css">
   </head>
@@ -39,7 +39,7 @@
       </section>
       <section id="scanner-panel" class="panel" role="tabpanel" aria-labelledby="scanner-tab" data-panel="scanner" hidden>
         <div class="section-heading"><div><p class="eyebrow">BYBIT FIRST</p><h2>Market scanner</h2></div></div>
-        <div class="toolbar"><label>Universe<select id="scanner-universe"><option>Bybit USDT perpetuals</option></select></label><button type="button">Run scanner</button></div>
+        <div class="toolbar"><label>Universe<select id="scanner-universe"><option>Bybit USDT perpetuals</option></select></label><button id="scanner-run" type="button">Run scanner</button></div>
         <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress><span>0 / 0</span></div>
         <div id="scanner-results" class="table-wrap"><p class="empty-state">Scanner results will appear here.</p></div>
       </section>
@@ -51,10 +51,11 @@
           <fieldset><legend>Wait candles by mode</legend><div class="field-grid"><label>Common<input name="waitCommon" type="number" value="8" min="1" max="500"></label><label>Scalp<input name="waitScalp" type="number" value="6" min="1" max="500"></label><label>Day<input name="waitDay" type="number" value="12" min="1" max="500"></label><label>Daily<input name="waitDaily" type="number" value="6" min="1" max="500"></label><label>Swing<input name="waitSwing" type="number" value="4" min="1" max="500"></label></div></fieldset>
           <fieldset><legend>Selected symbols</legend><label for="backtest-symbols">Symbols</label><input id="backtest-symbols" name="symbols" placeholder="BTC, ETH, HBAR"><button type="submit">Run backtest</button></fieldset>
         </form>
+        <section id="backtest-run-card" class="summary-card" aria-label="Backtest run card"></section>
         <div id="backtest-metrics" class="metrics-grid"></div>
         <section class="chart-card"><h3>Equity curve</h3><div id="equity-chart" class="chart-container"><svg viewBox="0 0 800 180" role="img" aria-label="Equity curve placeholder"><polyline points="0,150 200,125 400,135 600,80 800,55"></polyline></svg></div></section>
         <div class="split-grid"><section><h3>By symbol</h3><div id="symbol-summary" class="table-wrap"></div></section><section><h3>By mode</h3><div id="mode-summary" class="table-wrap"></div></section></div>
-        <section><div class="section-heading"><h3>Trades</h3><button type="button">Export CSV</button></div><div id="trade-results" class="table-wrap"></div></section>
+        <section><div class="section-heading"><h3>Trades</h3><button id="export-csv" type="button">Export CSV</button></div><div id="trade-results" class="table-wrap"></div></section>
       </section>
       <section id="auxiliary-panel" class="panel" role="tabpanel" aria-labelledby="auxiliary-tab" data-panel="auxiliary" hidden>
         <div class="section-heading"><div><p class="eyebrow">CONTEXT</p><h2>Auxiliary signals</h2></div></div>

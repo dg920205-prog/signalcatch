@@ -128,7 +128,7 @@ test("index declares strict CSP and external stylesheet and module script", asyn
 
   assert.ok(
     html.includes(
-      "default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com https://api.coingecko.com; object-src 'none'; base-uri 'none'; form-action 'none'",
     ),
   );
   assert.match(html, /<link rel="stylesheet" href="css\/styles\.css">/);

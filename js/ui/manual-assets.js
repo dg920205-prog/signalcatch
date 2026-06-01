@@ -10,8 +10,18 @@ function safeRead(value, key, fallback) {
   }
 }
 
+function toPrice(value) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")
+    : "-";
+}
+
 function renderDiagnostic(diagnostic = {}, dom) {
-  return dom.el("li", {}, `${safeText(safeRead(diagnostic, "kind"), "unknown")} · ${safeText(safeRead(diagnostic, "operation"), "unknown")}`);
+  return dom.el(
+    "li",
+    {},
+    `${safeText(safeRead(diagnostic, "kind"), "unknown")} | ${safeText(safeRead(diagnostic, "operation"), "unknown")}`,
+  );
 }
 
 export function renderManualAssetCard(container, asset = {}, { dom }) {
@@ -20,28 +30,104 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
   const modeResults = safeRead(asset, "modeResults", {});
   const diagnostics = safeRead(asset, "diagnostics", []);
   const error = safeRead(asset, "error", "");
-  const card = dom.el("article", { class: `asset-card status-${status}` },
-    dom.el("div", { class: "card-heading" },
-      dom.el("div", {},
+  const recommendation = safeRead(asset, "recommendation", {});
+  const plan = safeRead(recommendation, "plan", null);
+  const split = safeRead(recommendation, "split", null);
+  const quality = safeText(safeRead(recommendation, "label"), "비추천");
+  const notes = snapshotArray(safeRead(recommendation, "notes", []), 3).values;
+
+  const card = dom.el(
+    "article",
+    { class: `asset-card status-${status}` },
+    dom.el(
+      "div",
+      { class: "card-heading" },
+      dom.el(
+        "div",
+        {},
         dom.el("strong", {}, safeText(safeRead(asset, "symbol"), "Unknown")),
         dom.el("span", { class: "exchange-tag" }, safeText(safeRead(asset, "exchange"), "Bybit")),
       ),
       dom.el("span", { class: "status-label" }, status),
     ),
     dom.el("p", { class: "price" }, safeText(safeRead(ticker, "price"), "Price pending")),
-    dom.el("div", { class: "mode-row" }, MODES.map((mode) =>
-      dom.el("span", { class: safeRead(safeRead(modeResults, mode, {}), "eligible", false) ? "mode eligible" : "mode" }, mode))),
+    dom.el("p", { class: "quality-line" }, `진입 품질: ${quality}`),
+    dom.el(
+      "div",
+      { class: "mode-row" },
+      MODES.map((mode) =>
+        dom.el(
+          "span",
+          { class: safeRead(safeRead(modeResults, mode, {}), "eligible", false) ? "mode eligible" : "mode" },
+          mode,
+        ),
+      ),
+    ),
   );
+
+  if (plan) {
+    dom.append(
+      card,
+      dom.el(
+        "div",
+        { class: "plan-row" },
+        dom.el("span", {}, `진입 ${toPrice(plan.entryLow)} ~ ${toPrice(plan.entryHigh)}`),
+        dom.el("span", {}, `손절 ${toPrice(plan.sl)}`),
+        dom.el("span", {}, `목표 ${toPrice(plan.tp)}`),
+      ),
+    );
+  }
+
+  if (split?.entries?.length && split?.targets?.length) {
+    dom.append(
+      card,
+      dom.el(
+        "details",
+        { class: "diagnostics" },
+        dom.el("summary", {}, "분할 진입/익절"),
+        dom.el(
+          "p",
+          {},
+          `진입 ${split.entries
+            .map((entry) => `${entry.label} ${toPrice(entry.price)} (${entry.weightPct}%)`)
+            .join(", ")}`,
+        ),
+        dom.el(
+          "p",
+          {},
+          `익절 ${split.targets
+            .map((target) => `${target.label} ${toPrice(target.price)} (${target.weightPct}%)`)
+            .join(", ")}`,
+        ),
+      ),
+    );
+  }
+
+  if (notes.length) {
+    dom.append(
+      card,
+      dom.el(
+        "p",
+        { class: "muted" },
+        notes.map((note) => safeText(note, "")).join(" | "),
+      ),
+    );
+  }
 
   if (safeText(error)) {
     dom.append(card, dom.el("p", { class: "error-text" }, safeText(error)));
   }
   const diagnosticItems = snapshotArray(diagnostics, 20).values;
   if (diagnosticItems.length) {
-    dom.append(card, dom.el("details", { class: "diagnostics" },
-      dom.el("summary", {}, "Diagnostics"),
-      dom.el("ul", {}, diagnosticItems.map((item) => renderDiagnostic(item, dom))),
-    ));
+    dom.append(
+      card,
+      dom.el(
+        "details",
+        { class: "diagnostics" },
+        dom.el("summary", {}, "Diagnostics"),
+        dom.el("ul", {}, diagnosticItems.map((item) => renderDiagnostic(item, dom))),
+      ),
+    );
   }
 
   dom.append(container, card);
@@ -52,7 +138,10 @@ export function renderManualAssets(container, assets = [], options) {
   options.dom.clear(container);
   const items = snapshotArray(assets).values;
   if (items.length === 0) {
-    options.dom.append(container, options.dom.el("p", { class: "empty-state" }, "Add a symbol to begin monitoring."));
+    options.dom.append(
+      container,
+      options.dom.el("p", { class: "empty-state" }, "Add a symbol to begin monitoring."),
+    );
     return;
   }
   for (const asset of items) {
