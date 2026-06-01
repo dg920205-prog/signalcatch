@@ -160,20 +160,23 @@ test("market regime is neutral with insufficient data", () => {
 });
 
 test("market regime follows aligned rising and falling BTC and ETH analyses", () => {
-  assert.equal(
-    analyzeMarketRegime({
-      btcCandles: trendingCandles(100, 2),
-      ethCandles: trendingCandles(200, 3),
-    }).direction,
-    "bull",
-  );
-  assert.equal(
-    analyzeMarketRegime({
-      btcCandles: trendingCandles(200, -2),
-      ethCandles: trendingCandles(300, -3),
-    }).direction,
-    "bear",
-  );
+  const bull = analyzeMarketRegime({
+    btcCandles: trendingCandles(100, 2),
+    ethCandles: trendingCandles(200, 3),
+  });
+  const bear = analyzeMarketRegime({
+    btcCandles: trendingCandles(200, -2),
+    ethCandles: trendingCandles(300, -3),
+  });
+
+  assert.equal(bull.direction, "bull");
+  assert.equal(bear.direction, "bear");
+
+  for (const regime of [bull, bear]) {
+    assert.equal(Array.isArray(regime.reasons), true);
+    assert.equal(regime.reasons.length > 0, true);
+    assert.equal(regime.reasons.some((reason) => /[가-힣]/.test(reason)), true);
+  }
 });
 
 test("scanner caps concurrency, normalizes duplicates, limits symbols, and reports progress", async () => {
