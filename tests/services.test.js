@@ -157,6 +157,8 @@ test("market regime is neutral with insufficient data", () => {
   assert.equal(regime.direction, "neutral");
   assert.equal(Array.isArray(regime.reasons), true);
   assert.equal(regime.reasons.length > 0, true);
+  assert.match(regime.reasons.join(" "), /캔들이 부족/);
+  assert.doesNotMatch(regime.reasons.join(" "), /일치하지/);
 });
 
 test("market regime follows aligned rising and falling BTC and ETH analyses", () => {
@@ -177,6 +179,19 @@ test("market regime follows aligned rising and falling BTC and ETH analyses", ()
     assert.equal(regime.reasons.length > 0, true);
     assert.equal(regime.reasons.some((reason) => /[가-힣]/.test(reason)), true);
   }
+});
+
+test("market regime explains actual BTC and ETH direction mismatches", () => {
+  const regime = analyzeMarketRegime({
+    btcCandles: trendingCandles(100, 2),
+    ethCandles: trendingCandles(300, -3),
+  });
+
+  assert.equal(regime.direction, "neutral");
+  assert.equal(
+    regime.reasons.includes("BTC와 ETH 방향이 일치하지 않습니다."),
+    true,
+  );
 });
 
 test("scanner caps concurrency, normalizes duplicates, limits symbols, and reports progress", async () => {
