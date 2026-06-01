@@ -9,7 +9,7 @@ import {
   renderTrades,
 } from "../js/ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary } from "../js/ui/dashboard.js";
-import { createDom } from "../js/ui/dom.js";
+import { createDom, snapshotArray } from "../js/ui/dom.js";
 import { renderManualAssetCard, renderManualAssets } from "../js/ui/manual-assets.js";
 import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
@@ -225,9 +225,9 @@ test("buildBacktestRequest converts hostile form state boundaries into a safe se
   for (const property of ["symbols", "selected", "modes", "startDate", "endDate", "roundTripFeePct", "roundTripSlippagePct", "waitCandles"]) {
     assert.throws(() => buildBacktestRequest(throwingGetter(property)), new RegExp(message));
   }
-  for (const property of ["symbols", "selected", "modes"]) {
-    assert.throws(() => buildBacktestRequest({ ...valid, [property]: hostileArray }), new RegExp(message));
-  }
+  assert.doesNotThrow(() => buildBacktestRequest({ ...valid, symbols: hostileArray }));
+  assert.doesNotThrow(() => buildBacktestRequest({ ...valid, selected: hostileArray }));
+  assert.throws(() => buildBacktestRequest({ ...valid, modes: hostileArray }), new RegExp(message));
   assert.throws(
     () => buildBacktestRequest({ ...valid, waitCandles: new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("private wait"); } }) }),
     new RegExp(message),
@@ -391,6 +391,73 @@ test("renderer snapshots skip hostile collection indexes without using iterators
 
   assert.doesNotThrow(() => renderManualAssets(container, collection, { dom }));
   assert.equal(flattenText(container).includes("ETH"), true);
+});
+
+test("snapshotArray skips own accessors, inherited indexes, and descriptor trap failures", () => {
+  let getterCalls = 0;
+  const ownAccessor = [];
+  ownAccessor.length = 2;
+  Object.defineProperty(ownAccessor, 0, {
+    get() {
+      getterCalls += 1;
+      return "ACCESSOR";
+    },
+  });
+  ownAccessor[1] = "OWN";
+
+  assert.deepEqual(snapshotArray(ownAccessor), { ok: true, truncated: false, values: ["OWN"] });
+  assert.equal(getterCalls, 0);
+
+  const inherited = [];
+  inherited.length = 1;
+  Array.prototype[0] = "INHERITED";
+  try {
+    assert.deepEqual(snapshotArray(inherited), { ok: true, truncated: false, values: [] });
+  } finally {
+    delete Array.prototype[0];
+  }
+
+  const descriptorTrap = new Proxy(["BTC"], {
+    getOwnPropertyDescriptor() {
+      throw new Error("blocked descriptor");
+    },
+  });
+  assert.deepEqual(snapshotArray(descriptorTrap), { ok: false, values: [] });
+});
+
+test("strict backtest collections reject accessors and inherited indexes while renderers skip them", () => {
+  let getterCalls = 0;
+  const selected = [];
+  selected.length = 1;
+  Object.defineProperty(selected, 0, {
+    get() {
+      getterCalls += 1;
+      return "BTC";
+    },
+  });
+  const valid = {
+    symbols: ["BTC"],
+    selected,
+    startDate: "2026-01-01",
+    endDate: "2026-03-31",
+  };
+  assert.throws(() => buildBacktestRequest(valid), INVALID_BACKTEST_SETTINGS);
+  assert.equal(getterCalls, 0);
+
+  const inherited = [];
+  inherited.length = 1;
+  Array.prototype[0] = "BTC";
+  try {
+    assert.throws(
+      () => buildBacktestRequest({ ...valid, selected: inherited }),
+      INVALID_BACKTEST_SETTINGS,
+    );
+    const container = new FakeNode("section");
+    assert.doesNotThrow(() => renderManualAssets(container, inherited, { dom: createDom(createFakeDocument()) }));
+    assert.equal(flattenText(container).includes("Add a symbol"), true);
+  } finally {
+    delete Array.prototype[0];
+  }
 });
 
 test("index exposes tab, progress, and backtest form accessibility contracts", async () => {

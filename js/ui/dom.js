@@ -22,7 +22,11 @@ export function snapshotArray(value, limit = 500, { strict = false } = {}) {
       return { ok: false, values: [] };
     }
 
-    const length = value.length;
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+    if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, "value")) {
+      return { ok: false, values: [] };
+    }
+    const length = lengthDescriptor.value;
     if (!Number.isSafeInteger(length) || length < 0) {
       return { ok: false, values: [] };
     }
@@ -30,11 +34,19 @@ export function snapshotArray(value, limit = 500, { strict = false } = {}) {
     const values = [];
     for (let index = 0; index < Math.min(length, limit); index += 1) {
       try {
-        values.push(value[index]);
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+          if (strict) {
+            return { ok: false, values: [] };
+          }
+          continue;
+        }
+        values.push(descriptor.value);
       } catch {
         if (strict) {
           return { ok: false, values: [] };
         }
+        return { ok: false, values: [] };
       }
     }
     return { ok: true, truncated: length > limit, values };
