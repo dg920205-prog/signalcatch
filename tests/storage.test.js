@@ -410,22 +410,100 @@ test("state removes prototype pollution keys while cloning boundaries", () => {
   assert.equal({}.nestedPolluted, undefined);
 });
 
-test("state fallback clone isolates nested values and removes unsafe keys", () => {
-  const nativeStructuredClone = globalThis.structuredClone;
-  const initial = JSON.parse(
-    '{"nested":{"value":1,"__proto__":{"nestedPolluted":true}},"prototype":{"polluted":true}}',
+test("state does not invoke unsafe or ordinary accessor properties", () => {
+  let unsafeGetterCalls = 0;
+  let ordinaryGetterCalls = 0;
+  const initial = { safe: "kept" };
+
+  Object.defineProperty(initial, "__proto__", {
+    enumerable: true,
+    get() {
+      unsafeGetterCalls += 1;
+      return { polluted: true };
+    },
+  });
+  Object.defineProperty(initial, "computed", {
+    enumerable: true,
+    get() {
+      ordinaryGetterCalls += 1;
+      return "remove-me";
+    },
+  });
+
+  assert.deepEqual(createState(initial).getState(), { safe: "kept" });
+  assert.equal(unsafeGetterCalls, 0);
+  assert.equal(ordinaryGetterCalls, 0);
+});
+
+test("state ignores throwing nested getters without interrupting setState", () => {
+  const state = createState({ count: 1 });
+  const patch = { nested: { safe: "kept" } };
+
+  Object.defineProperty(patch.nested, "blocked", {
+    enumerable: true,
+    get() {
+      throw new Error("blocked");
+    },
+  });
+
+  assert.doesNotThrow(() => state.setState(patch));
+  assert.deepEqual(state.getState(), { count: 1, nested: { safe: "kept" } });
+});
+
+test("state treats hostile proxy initial values as empty state and ignores hostile patches", () => {
+  const hostileInitial = new Proxy(
+    {},
+    {
+      getPrototypeOf() {
+        throw new Error("blocked");
+      },
+    },
   );
+  const hostilePatch = new Proxy(
+    {},
+    {
+      ownKeys() {
+        throw new Error("blocked");
+      },
+    },
+  );
+  const hostileDescriptorPatch = new Proxy(
+    { blocked: true },
+    {
+      getOwnPropertyDescriptor() {
+        throw new Error("blocked");
+      },
+    },
+  );
+  const state = createState(hostileInitial);
 
-  try {
-    globalThis.structuredClone = undefined;
-    const state = createState(initial);
+  assert.deepEqual(state.getState(), {});
+  assert.doesNotThrow(() => state.setState(hostilePatch));
+  assert.doesNotThrow(() => state.setState(hostileDescriptorPatch));
+  assert.deepEqual(state.getState(), {});
+});
 
-    initial.nested.value = 2;
+test("state ignores non-plain values, cycles, and values beyond the depth limit", () => {
+  const cyclic = {};
+  cyclic.self = cyclic;
+  let tooDeep = "remove-me";
 
-    assert.deepEqual(state.getState(), { nested: { value: 1 } });
-  } finally {
-    globalThis.structuredClone = nativeStructuredClone;
+  for (let index = 0; index < 21; index += 1) {
+    tooDeep = { nested: tooDeep };
   }
+
+  const state = createState({
+    keep: [null, "text", true, 1],
+    nonFinite: Number.POSITIVE_INFINITY,
+    date: new Date(),
+    fn() {},
+    symbol: Symbol("remove-me"),
+    bigint: 1n,
+    cyclic,
+    tooDeep,
+  });
+
+  assert.deepEqual(state.getState(), { keep: [null, "text", true, 1] });
 });
 
 test("state isolates listener failures and still calls later listeners", () => {
