@@ -353,7 +353,7 @@ test("clear removes saved settings", () => {
   assert.deepEqual(backend.snapshot(), {});
 });
 
-test("state returns shallow copies and notifies subscribers", () => {
+test("state returns copies and notifies subscribers", () => {
   const state = createState({ activeTab: "manual", count: 1 });
   const notifications = [];
   const unsubscribe = state.subscribe((nextState) => notifications.push(nextState));
@@ -367,4 +367,77 @@ test("state returns shallow copies and notifies subscribers", () => {
   assert.deepEqual(firstRead, { activeTab: "manual", count: 99 });
   assert.deepEqual(state.getState(), { activeTab: "manual", count: 3 });
   assert.deepEqual(notifications, [{ activeTab: "manual", count: 2 }]);
+});
+
+test("state isolates nested initial, patch, read, and listener values", () => {
+  const initial = { ui: { activeTab: "manual" } };
+  const patch = { filters: { exchange: "bybit" } };
+  const state = createState(initial);
+  let notification;
+
+  state.subscribe((nextState) => {
+    notification = nextState;
+    nextState.ui.activeTab = "listener-mutated";
+    nextState.filters.exchange = "listener-mutated";
+  });
+
+  initial.ui.activeTab = "initial-mutated";
+  state.setState(patch);
+  patch.filters.exchange = "patch-mutated";
+
+  const firstRead = state.getState();
+  firstRead.ui.activeTab = "read-mutated";
+  firstRead.filters.exchange = "read-mutated";
+
+  assert.deepEqual(notification, {
+    ui: { activeTab: "listener-mutated" },
+    filters: { exchange: "listener-mutated" },
+  });
+  assert.deepEqual(state.getState(), {
+    ui: { activeTab: "manual" },
+    filters: { exchange: "bybit" },
+  });
+});
+
+test("state removes prototype pollution keys while cloning boundaries", () => {
+  const polluted = JSON.parse(
+    '{"safe":{"value":1,"__proto__":{"nestedPolluted":true}},"__proto__":{"polluted":true},"constructor":{"polluted":true},"prototype":{"polluted":true}}',
+  );
+  const state = createState(polluted);
+
+  assert.deepEqual(state.getState(), { safe: { value: 1 } });
+  assert.equal({}.polluted, undefined);
+  assert.equal({}.nestedPolluted, undefined);
+});
+
+test("state fallback clone isolates nested values and removes unsafe keys", () => {
+  const nativeStructuredClone = globalThis.structuredClone;
+  const initial = JSON.parse(
+    '{"nested":{"value":1,"__proto__":{"nestedPolluted":true}},"prototype":{"polluted":true}}',
+  );
+
+  try {
+    globalThis.structuredClone = undefined;
+    const state = createState(initial);
+
+    initial.nested.value = 2;
+
+    assert.deepEqual(state.getState(), { nested: { value: 1 } });
+  } finally {
+    globalThis.structuredClone = nativeStructuredClone;
+  }
+});
+
+test("state isolates listener failures and still calls later listeners", () => {
+  const state = createState({ count: 0 });
+  const notifications = [];
+
+  state.subscribe(() => {
+    throw new Error("blocked");
+  });
+  state.subscribe((nextState) => notifications.push(nextState));
+
+  assert.doesNotThrow(() => state.setState({ count: 1 }));
+  assert.deepEqual(notifications, [{ count: 1 }]);
+  assert.deepEqual(state.getState(), { count: 1 });
 });
