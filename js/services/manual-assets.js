@@ -10,6 +10,14 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function safeRead(value, key) {
+  try {
+    return value?.[key];
+  } catch {
+    return undefined;
+  }
+}
+
 function safeDetail(detail) {
   const safe = {};
 
@@ -18,23 +26,28 @@ function safeDetail(detail) {
   }
 
   for (const key of ["exchange", "operation", "symbol", "occurredAt"]) {
-    if (typeof detail[key] === "string") {
-      safe[key] = detail[key];
+    const value = safeRead(detail, key);
+
+    if (typeof value === "string") {
+      safe[key] = value;
     }
   }
 
-  if (Number.isInteger(detail.status) || typeof detail.status === "string") {
-    safe.status = detail.status;
+  const status = safeRead(detail, "status");
+
+  if (Number.isInteger(status) || typeof status === "string") {
+    safe.status = status;
   }
 
   return safe;
 }
 
 function diagnostic(error, operation) {
-  const detail = safeDetail(error?.detail);
+  const detail = safeDetail(safeRead(error, "detail"));
+  const kind = safeRead(error, "kind");
 
   return {
-    kind: typeof error?.kind === "string" ? error.kind : "unknown",
+    kind: typeof kind === "string" ? kind : "unknown",
     ...detail,
     operation: detail.operation ?? operation,
   };
@@ -55,39 +68,52 @@ export function createManualAssetService(adapters) {
   const assets = new Map();
 
   async function load(asset) {
-    const adapter = adapters?.[asset.exchange.toLowerCase()];
+    const adapter = safeRead(adapters, asset.exchange.toLowerCase());
 
     if (!adapter) {
       throw new Error("Missing exchange adapter.");
     }
 
+    const version = asset.version + 1;
+    asset.version = version;
     asset.status = "loading";
     asset.error = null;
     asset.diagnostics = [];
 
     const [tickerResult, candlesResult] = await Promise.allSettled([
-      adapter.fetchTicker(asset.symbol),
-      adapter.fetchCandles(asset.symbol),
+      Promise.resolve().then(() => adapter.fetchTicker(asset.symbol)),
+      Promise.resolve().then(() => adapter.fetchCandles(asset.symbol)),
     ]);
+    const next = {
+      ticker: asset.ticker,
+      analysis: asset.analysis,
+      modeResults: asset.modeResults,
+      diagnostics: [],
+    };
 
     if (tickerResult.status === "fulfilled") {
-      asset.ticker = tickerResult.value;
+      next.ticker = tickerResult.value;
     } else {
-      asset.diagnostics.push(diagnostic(tickerResult.reason, "fetchTicker"));
+      next.diagnostics.push(diagnostic(tickerResult.reason, "fetchTicker"));
     }
 
     if (candlesResult.status === "fulfilled") {
       try {
-        asset.analysis = analyzeCandles(candlesResult.value);
-        asset.modeResults = classifyModes(asset.analysis);
+        next.analysis = analyzeCandles(candlesResult.value);
+        next.modeResults = classifyModes(next.analysis);
       } catch (error) {
-        asset.diagnostics.push(diagnostic(error, "analyzeCandles"));
+        next.diagnostics.push(diagnostic(error, "analyzeCandles"));
       }
     } else {
-      asset.diagnostics.push(diagnostic(candlesResult.reason, "fetchCandles"));
+      next.diagnostics.push(diagnostic(candlesResult.reason, "fetchCandles"));
     }
 
-    asset.status = asset.diagnostics.length === 0 ? "ready" : "error";
+    if (assets.get(asset.id) !== asset || asset.version !== version) {
+      return null;
+    }
+
+    Object.assign(asset, next);
+    asset.status = next.diagnostics.length === 0 ? "ready" : "error";
     asset.error =
       asset.status === "error" ? "Some asset data could not be loaded." : null;
 
@@ -115,6 +141,7 @@ export function createManualAssetService(adapters) {
         ticker: null,
         analysis: null,
         modeResults: classifyModes(),
+        version: 0,
       };
 
       assets.set(id, asset);

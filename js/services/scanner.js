@@ -9,8 +9,16 @@ function abortError() {
   return new DOMException("Scanner run aborted.", "AbortError");
 }
 
+function safeRead(value, key) {
+  try {
+    return value?.[key];
+  } catch {
+    return undefined;
+  }
+}
+
 function throwIfAborted(signal) {
-  if (signal?.aborted) {
+  if (safeRead(signal, "aborted")) {
     throw abortError();
   }
 }
@@ -23,26 +31,75 @@ function safeDetail(detail) {
   }
 
   for (const key of ["exchange", "operation", "symbol", "occurredAt"]) {
-    if (typeof detail[key] === "string") {
-      safe[key] = detail[key];
+    const value = safeRead(detail, key);
+
+    if (typeof value === "string") {
+      safe[key] = value;
     }
   }
 
-  if (Number.isInteger(detail.status) || typeof detail.status === "string") {
-    safe.status = detail.status;
+  const status = safeRead(detail, "status");
+
+  if (Number.isInteger(status) || typeof status === "string") {
+    safe.status = status;
   }
 
   return safe;
 }
 
 function diagnostic(error) {
-  const detail = safeDetail(error?.detail);
+  const detail = safeDetail(safeRead(error, "detail"));
+  const kind = safeRead(error, "kind");
 
   return {
-    kind: typeof error?.kind === "string" ? error.kind : "unknown",
+    kind: typeof kind === "string" ? kind : "unknown",
     ...detail,
     operation: detail.operation ?? "fetchCandles",
   };
+}
+
+function normalizeSymbols(symbols, maxSymbols) {
+  let isArray = false;
+
+  try {
+    isArray = Array.isArray(symbols);
+  } catch {
+    // Revoked proxies and hostile collections are not valid scanner input.
+  }
+
+  if (!isArray) {
+    throw new Error("Scanner symbols must be an array.");
+  }
+
+  const normalized = [];
+  const seen = new Set();
+
+  for (let index = 0; index < maxSymbols; index += 1) {
+    let symbol;
+
+    try {
+      symbol = symbols[index];
+    } catch {
+      continue;
+    }
+
+    if (symbol === undefined) {
+      continue;
+    }
+
+    try {
+      const normalizedSymbol = normalizeBaseSymbol(symbol);
+
+      if (!seen.has(normalizedSymbol)) {
+        seen.add(normalizedSymbol);
+        normalized.push(normalizedSymbol);
+      }
+    } catch {
+      // Invalid symbols are isolated so other scan candidates can continue.
+    }
+  }
+
+  return normalized;
 }
 
 export function createScannerService({
@@ -56,7 +113,7 @@ export function createScannerService({
     throw new Error("Invalid scanner configuration.");
   }
 
-  if (!Number.isInteger(maxSymbols) || maxSymbols < 1) {
+  if (!Number.isInteger(maxSymbols) || maxSymbols < 1 || maxSymbols > 500) {
     throw new Error("Invalid scanner configuration.");
   }
 
@@ -73,9 +130,7 @@ export function createScannerService({
       try {
         throwIfAborted(signal);
 
-        const normalizedSymbols = [
-          ...new Set(symbols.map((symbol) => normalizeBaseSymbol(symbol))),
-        ].slice(0, maxSymbols);
+        const normalizedSymbols = normalizeSymbols(symbols, maxSymbols);
         const candidates = new Array(normalizedSymbols.length);
         let nextIndex = 0;
         let completed = 0;
@@ -94,19 +149,25 @@ export function createScannerService({
             const symbol = normalizedSymbols[index];
 
             try {
-              const candles = await bybit.fetchCandles(symbol, { signal });
+              const candles = await Promise.resolve().then(() =>
+                bybit.fetchCandles(symbol, { signal }),
+              );
               throwIfAborted(signal);
               const analysis = analyze(candles);
               candidates[index] = {
                 symbol,
                 exchange: "Bybit",
                 status: "ready",
+                error: null,
                 diagnostics: [],
                 analysis,
                 modeResults: signalClassify(analysis),
               };
             } catch (error) {
-              if (error?.name === "AbortError" || signal?.aborted) {
+              if (
+                safeRead(error, "name") === "AbortError" ||
+                safeRead(signal, "aborted")
+              ) {
                 throw abortError();
               }
 
@@ -114,6 +175,7 @@ export function createScannerService({
                 symbol,
                 exchange: "Bybit",
                 status: "error",
+                error: "Some scanner data could not be loaded.",
                 diagnostics: [diagnostic(error)],
                 analysis: null,
                 modeResults: signalClassify(),
@@ -121,7 +183,12 @@ export function createScannerService({
             }
 
             completed += 1;
-            onProgress?.({ completed, total: normalizedSymbols.length, symbol });
+
+            try {
+              onProgress?.({ completed, total: normalizedSymbols.length, symbol });
+            } catch {
+              // Consumer progress reporting must not interrupt a scanner run.
+            }
           }
         }
 

@@ -151,6 +151,110 @@ test("manual assets reject duplicates, remove cards, refresh cards, and allow Bi
   );
 });
 
+test("manual asset discards stale refresh results that finish out of order", async () => {
+  const first = deferred();
+  const second = deferred();
+  let refreshCount = 0;
+  const service = createManualAssetService(
+    adapters({
+      bybit: {
+        fetchTicker: async (symbol) => {
+          refreshCount += 1;
+
+          if (refreshCount === 1) {
+            return { symbol: `${symbol}USDT`, price: 1 };
+          }
+
+          return refreshCount === 2 ? first.promise : second.promise;
+        },
+      },
+    }),
+  );
+  const added = await service.add({ symbol: "btc", exchange: "bybit" });
+  const stale = service.refresh(added.id);
+  const current = service.refresh(added.id);
+
+  second.resolve({ symbol: "BTCUSDT", price: 3 });
+  await current;
+  first.resolve({ symbol: "BTCUSDT", price: 2 });
+  await stale;
+
+  assert.equal(service.list()[0].ticker.price, 3);
+});
+
+test("manual asset does not return or restore a removed card after pending load", async () => {
+  const candles = deferred();
+  const service = createManualAssetService(
+    adapters({ bybit: { fetchCandles: () => candles.promise } }),
+  );
+  const pending = service.add({ symbol: "btc", exchange: "bybit" });
+  const { id } = service.list()[0];
+
+  assert.equal(service.remove(id), true);
+  candles.resolve(trendingCandles(100, 2));
+
+  const result = await pending;
+
+  assert.equal(service.list().length, 0);
+  assert.equal(result === null || ["removed", "stale"].includes(result.status), true);
+});
+
+test("manual asset converts synchronous adapter throws into diagnostics", async () => {
+  const service = createManualAssetService(
+    adapters({
+      bybit: {
+        fetchTicker() {
+          throw new Error("private sync ticker failure");
+        },
+        fetchCandles() {
+          throw new Error("private sync candle failure");
+        },
+      },
+    }),
+  );
+
+  const asset = await service.add({ symbol: "btc", exchange: "bybit" });
+
+  assert.equal(asset.status, "error");
+  assert.equal(asset.diagnostics.length, 2);
+});
+
+test("manual asset diagnostics tolerate throwing detail getters and proxies", async () => {
+  const getterError = new Error("private getter failure");
+  Object.defineProperty(getterError, "detail", {
+    get() {
+      throw new Error("private detail getter");
+    },
+  });
+  const proxyError = new Error("private proxy failure");
+  proxyError.detail = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("private proxy getter");
+      },
+    },
+  );
+  let calls = 0;
+  const service = createManualAssetService(
+    adapters({
+      bybit: {
+        fetchTicker: async () => {
+          throw calls++ === 0 ? getterError : proxyError;
+        },
+      },
+    }),
+  );
+
+  const first = await service.add({ symbol: "btc", exchange: "bybit" });
+  const second = await service.add({ symbol: "eth", exchange: "bybit" });
+
+  assert.equal(first.status, "error");
+  assert.equal(second.status, "error");
+  assert.equal(first.error, "Some asset data could not be loaded.");
+  assert.equal(second.error, "Some asset data could not be loaded.");
+});
+
 test("market regime is neutral with insufficient data", () => {
   const regime = analyzeMarketRegime({ btcCandles: [], ethCandles: [] });
 
@@ -220,14 +324,13 @@ test("scanner caps concurrency, normalizes duplicates, limits symbols, and repor
   assert.equal(peak, 2);
   assert.deepEqual(
     candidates.map((candidate) => candidate.symbol),
-    ["BTC", "ETH", "SOL"],
+    ["BTC", "ETH"],
   );
   assert.deepEqual(
     progress.map(({ completed, total }) => [completed, total]),
     [
-      [1, 3],
-      [2, 3],
-      [3, 3],
+      [1, 2],
+      [2, 2],
     ],
   );
 });
@@ -290,6 +393,136 @@ test("scanner isolates failed symbols as safe diagnostic candidates", async () =
 
   assert.equal(candidates.length, 3);
   assert.equal(failed.status, "error");
+  assert.equal(failed.error, "Some scanner data could not be loaded.");
   assert.equal(failed.diagnostics.length, 1);
   assert.equal(JSON.stringify(failed.diagnostics).includes("secret upstream"), false);
+});
+
+test("scanner converts synchronous adapter throws into diagnostics", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchCandles() {
+        throw new Error("private sync scanner failure");
+      },
+    },
+  });
+
+  const [candidate] = await service.run({ symbols: ["btc"] });
+
+  assert.equal(candidate.status, "error");
+  assert.equal(candidate.error, "Some scanner data could not be loaded.");
+  assert.equal(candidate.diagnostics.length, 1);
+});
+
+test("scanner limits symbol reads and skips sparse entries", async () => {
+  const symbols = [];
+  symbols.length = 1_000_000;
+  symbols[0] = "btc";
+  symbols[1] = "eth";
+  Object.defineProperty(symbols, 2, {
+    get() {
+      throw new Error("scanner read beyond maxSymbols");
+    },
+  });
+  const service = createScannerService({
+    maxSymbols: 2,
+    bybit: { fetchCandles: async () => trendingCandles(100, 2) },
+  });
+
+  const candidates = await service.run({ symbols });
+
+  assert.deepEqual(
+    candidates.map(({ symbol }) => symbol),
+    ["BTC", "ETH"],
+  );
+});
+
+test("scanner isolates hostile symbol getters within the inspection limit", async () => {
+  const symbols = ["btc", "eth", "sol"];
+  Object.defineProperty(symbols, 1, {
+    get() {
+      throw new Error("hostile symbol getter");
+    },
+  });
+  const service = createScannerService({
+    maxSymbols: 3,
+    bybit: { fetchCandles: async () => trendingCandles(100, 2) },
+  });
+
+  const candidates = await service.run({ symbols });
+
+  assert.deepEqual(
+    candidates.map(({ symbol }) => symbol),
+    ["BTC", "SOL"],
+  );
+});
+
+test("scanner rejects unsafe symbols collections and maxSymbols values", async () => {
+  const bybit = { fetchCandles: async () => trendingCandles(100, 2) };
+
+  await assert.rejects(
+    createScannerService({ bybit }).run({ symbols: { 0: "btc", length: 1 } }),
+    /symbols/i,
+  );
+  assert.throws(
+    () => createScannerService({ bybit, maxSymbols: 501 }),
+    /configuration/i,
+  );
+});
+
+test("scanner isolates progress callback failures and continues scanning", async () => {
+  const service = createScannerService({
+    bybit: { fetchCandles: async () => trendingCandles(100, 2) },
+  });
+
+  const candidates = await service.run({
+    symbols: ["btc", "eth"],
+    onProgress() {
+      throw new Error("consumer progress failure");
+    },
+  });
+
+  assert.deepEqual(
+    candidates.map(({ symbol }) => symbol),
+    ["BTC", "ETH"],
+  );
+});
+
+test("scanner diagnostics tolerate throwing detail getters and proxies", async () => {
+  const errors = [
+    Object.defineProperty(new Error("private getter failure"), "detail", {
+      get() {
+        throw new Error("private detail getter");
+      },
+    }),
+    Object.assign(new Error("private proxy failure"), {
+      detail: new Proxy(
+        {},
+        {
+          get() {
+            throw new Error("private proxy getter");
+          },
+        },
+      ),
+    }),
+  ];
+  let calls = 0;
+  const service = createScannerService({
+    bybit: {
+      fetchCandles: async () => {
+        throw errors[calls++];
+      },
+    },
+  });
+
+  const candidates = await service.run({ symbols: ["btc", "eth"] });
+
+  assert.deepEqual(
+    candidates.map(({ status }) => status),
+    ["error", "error"],
+  );
+  assert.equal(
+    JSON.stringify(candidates).includes("private"),
+    false,
+  );
 });
