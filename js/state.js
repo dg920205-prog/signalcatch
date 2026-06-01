@@ -1,23 +1,31 @@
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const INVALID = Symbol("invalid");
 const INVALID_STRUCTURE = Symbol("invalid-structure");
+const MAX_ARRAY_LENGTH = 1000;
 const MAX_DEPTH = 20;
+
+function isArrayIndex(key, length) {
+  return /^(0|[1-9]\d*)$/.test(key) && Number(key) < length;
+}
 
 function cloneArray(value, depth, ancestors) {
   if (Object.getPrototypeOf(value) !== Array.prototype) {
     return INVALID;
   }
 
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const length = descriptors.length?.value;
-  if (!Number.isSafeInteger(length) || length < 0) {
+  const length = Object.getOwnPropertyDescriptor(value, "length")?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > MAX_ARRAY_LENGTH) {
     return INVALID;
   }
 
-  const cloned = [];
-  for (let index = 0; index < length; index += 1) {
-    const descriptor = descriptors[index];
-    if (!descriptor || !("value" in descriptor)) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const cloned = new Array(length);
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (
+      !isArrayIndex(key, length) ||
+      !descriptor.enumerable ||
+      !("value" in descriptor)
+    ) {
       continue;
     }
 
@@ -26,7 +34,7 @@ function cloneArray(value, depth, ancestors) {
       return INVALID_STRUCTURE;
     }
     if (nestedValue !== INVALID) {
-      cloned.push(nestedValue);
+      cloned[key] = nestedValue;
     }
   }
 

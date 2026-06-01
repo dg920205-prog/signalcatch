@@ -506,6 +506,68 @@ test("state ignores non-plain values, cycles, and values beyond the depth limit"
   assert.deepEqual(state.getState(), { keep: [null, "text", true, 1] });
 });
 
+test("state preserves sparse array indexes and skips array metadata", () => {
+  const sparse = [];
+  sparse[2] = "third";
+  sparse.metadata = "remove-me";
+  sparse.constructor = "remove-me";
+
+  const cloned = createState({ sparse }).getState().sparse;
+
+  assert.equal(cloned.length, 3);
+  assert.equal(0 in cloned, false);
+  assert.equal(1 in cloned, false);
+  assert.equal(cloned[2], "third");
+  assert.equal("metadata" in cloned, false);
+  assert.equal(Object.hasOwn(cloned, "constructor"), false);
+});
+
+test("state drops arrays beyond the dashboard length limit without scanning indexes", () => {
+  let indexDescriptorReads = 0;
+  let ownKeyReads = 0;
+  const huge = new Proxy(
+    [],
+    {
+      ownKeys(target) {
+        ownKeyReads += 1;
+        return Reflect.ownKeys(target);
+      },
+      getOwnPropertyDescriptor(target, property) {
+        if (/^\d+$/.test(String(property))) {
+          indexDescriptorReads += 1;
+        }
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      },
+    },
+  );
+  huge.length = 1001;
+
+  assert.deepEqual(createState({ huge, safe: "kept" }).getState(), { safe: "kept" });
+  assert.equal(ownKeyReads, 0);
+  assert.equal(indexDescriptorReads, 0);
+});
+
+test("state skips array accessor indexes without invoking them", () => {
+  let getterCalls = 0;
+  const values = ["first"];
+
+  Object.defineProperty(values, 2, {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return "remove-me";
+    },
+  });
+
+  const cloned = createState({ values }).getState().values;
+
+  assert.equal(cloned[0], "first");
+  assert.equal(cloned.length, 3);
+  assert.equal(1 in cloned, false);
+  assert.equal(2 in cloned, false);
+  assert.equal(getterCalls, 0);
+});
+
 test("state isolates listener failures and still calls later listeners", () => {
   const state = createState({ count: 0 });
   const notifications = [];
