@@ -1,0 +1,104 @@
+const SAFE_ATTRIBUTES = new Set([
+  "id", "title", "type", "value", "name", "placeholder", "role", "class",
+  "for", "min", "max", "step", "open", "hidden", "datetime", "disabled",
+  "checked", "selected", "download", "viewBox", "points",
+]);
+
+function isSafeAttribute(name) {
+  return SAFE_ATTRIBUTES.has(name) || name.startsWith("aria-") || name.startsWith("data-");
+}
+
+export function safeText(value, fallback = "") {
+  return (
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  ) ? value : fallback;
+}
+
+export function snapshotArray(value, limit = 500, { strict = false } = {}) {
+  try {
+    if (!Array.isArray(value)) {
+      return { ok: false, values: [] };
+    }
+
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+    if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, "value")) {
+      return { ok: false, values: [] };
+    }
+    const length = lengthDescriptor.value;
+    if (!Number.isSafeInteger(length) || length < 0) {
+      return { ok: false, values: [] };
+    }
+
+    const values = [];
+    for (let index = 0; index < Math.min(length, limit); index += 1) {
+      try {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor || !Object.hasOwn(descriptor, "value")) {
+          if (strict) {
+            return { ok: false, values: [] };
+          }
+          continue;
+        }
+        values.push(descriptor.value);
+      } catch {
+        if (strict) {
+          return { ok: false, values: [] };
+        }
+        return { ok: false, values: [] };
+      }
+    }
+    return { ok: true, truncated: length > limit, values };
+  } catch {
+    return { ok: false, values: [] };
+  }
+}
+
+export function createDom(documentRef = globalThis.document) {
+  if (!documentRef?.createElement || !documentRef?.createTextNode) {
+    throw new TypeError("A document implementation is required.");
+  }
+
+  function setText(node, value = "") {
+    node.textContent = String(value ?? "");
+    return node;
+  }
+
+  function append(parent, ...children) {
+    for (const child of children.flat(Infinity)) {
+      if (child === null || child === undefined || child === false) {
+        continue;
+      }
+      parent.append(
+        typeof child === "string" || typeof child === "number"
+          ? documentRef.createTextNode(child)
+          : child,
+      );
+    }
+    return parent;
+  }
+
+  function clear(node) {
+    node.replaceChildren();
+    return node;
+  }
+
+  function el(tagName, attributes = {}, ...children) {
+    const node = documentRef.createElement(tagName);
+
+    for (const [name, value] of Object.entries(attributes ?? {})) {
+      if (/^on[A-Z]/.test(name) && typeof value === "function") {
+        node.addEventListener(name.slice(2).toLowerCase(), value);
+      } else if (isSafeAttribute(name) && value !== false && value !== undefined && value !== null) {
+        node.setAttribute(name, value === true ? "" : String(value));
+      }
+    }
+
+    return append(node, ...children);
+  }
+
+  return { append, clear, el, setText };
+}
+
+export const dom = globalThis.document ? createDom(globalThis.document) : null;

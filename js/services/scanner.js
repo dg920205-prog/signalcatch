@@ -1,0 +1,221 @@
+import { analyzeCandles, classifyModes } from "../analysis/signals.js";
+import { normalizeBaseSymbol } from "../core/symbols.js";
+
+function clone(value) {
+  return structuredClone(value);
+}
+
+function abortError() {
+  return new DOMException("Scanner run aborted.", "AbortError");
+}
+
+function safeRead(value, key) {
+  try {
+    return value?.[key];
+  } catch {
+    return undefined;
+  }
+}
+
+function throwIfAborted(signal) {
+  if (safeRead(signal, "aborted")) {
+    throw abortError();
+  }
+}
+
+function safeDetail(detail) {
+  const safe = {};
+
+  if (!detail || typeof detail !== "object") {
+    return safe;
+  }
+
+  for (const key of ["exchange", "operation", "symbol", "occurredAt"]) {
+    const value = safeRead(detail, key);
+
+    if (typeof value === "string") {
+      safe[key] = value;
+    }
+  }
+
+  const status = safeRead(detail, "status");
+
+  if (Number.isInteger(status) || typeof status === "string") {
+    safe.status = status;
+  }
+
+  return safe;
+}
+
+function diagnostic(error) {
+  const detail = safeDetail(safeRead(error, "detail"));
+  const kind = safeRead(error, "kind");
+
+  return {
+    kind: typeof kind === "string" ? kind : "unknown",
+    ...detail,
+    operation: detail.operation ?? "fetchCandles",
+  };
+}
+
+function normalizeSymbols(symbols, maxSymbols) {
+  let isArray = false;
+
+  try {
+    isArray = Array.isArray(symbols);
+  } catch {
+    // Revoked proxies and hostile collections are not valid scanner input.
+  }
+
+  if (!isArray) {
+    throw new Error("Scanner symbols must be an array.");
+  }
+
+  const normalized = [];
+  const seen = new Set();
+
+  for (let index = 0; index < maxSymbols; index += 1) {
+    let symbol;
+
+    try {
+      symbol = symbols[index];
+    } catch {
+      continue;
+    }
+
+    if (symbol === undefined) {
+      continue;
+    }
+
+    try {
+      const normalizedSymbol = normalizeBaseSymbol(symbol);
+
+      if (!seen.has(normalizedSymbol)) {
+        seen.add(normalizedSymbol);
+        normalized.push(normalizedSymbol);
+      }
+    } catch {
+      // Invalid symbols are isolated so other scan candidates can continue.
+    }
+  }
+
+  return normalized;
+}
+
+export function createScannerService({
+  bybit,
+  concurrency = 4,
+  maxSymbols = 100,
+  analyze = analyzeCandles,
+  signalClassify = classifyModes,
+}) {
+  if (
+    !bybit ||
+    !Number.isInteger(concurrency) ||
+    concurrency < 1 ||
+    concurrency > 10
+  ) {
+    throw new Error("Invalid scanner configuration.");
+  }
+
+  if (!Number.isInteger(maxSymbols) || maxSymbols < 1 || maxSymbols > 500) {
+    throw new Error("Invalid scanner configuration.");
+  }
+
+  let running = false;
+
+  return {
+    async run({ symbols = [], onProgress, signal } = {}) {
+      if (running) {
+        throw new Error("Scanner is already running.");
+      }
+
+      running = true;
+
+      try {
+        throwIfAborted(signal);
+
+        const normalizedSymbols = normalizeSymbols(symbols, maxSymbols);
+        const candidates = new Array(normalizedSymbols.length);
+        let nextIndex = 0;
+        let completed = 0;
+
+        async function worker() {
+          while (true) {
+            throwIfAborted(signal);
+
+            const index = nextIndex;
+            nextIndex += 1;
+
+            if (index >= normalizedSymbols.length) {
+              return;
+            }
+
+            const symbol = normalizedSymbols[index];
+
+            try {
+              const candles = await Promise.resolve().then(() =>
+                bybit.fetchCandles(symbol, { signal }),
+              );
+              throwIfAborted(signal);
+              const analysis = analyze(candles);
+              candidates[index] = {
+                symbol,
+                exchange: "Bybit",
+                status: "ready",
+                error: null,
+                diagnostics: [],
+                analysis,
+                modeResults: signalClassify(analysis),
+              };
+            } catch (error) {
+              if (
+                safeRead(error, "name") === "AbortError" ||
+                safeRead(signal, "aborted")
+              ) {
+                throw abortError();
+              }
+
+              candidates[index] = {
+                symbol,
+                exchange: "Bybit",
+                status: "error",
+                error: "Some scanner data could not be loaded.",
+                diagnostics: [diagnostic(error)],
+                analysis: null,
+                modeResults: signalClassify(),
+              };
+            }
+
+            completed += 1;
+
+            try {
+              onProgress?.({ completed, total: normalizedSymbols.length, symbol });
+            } catch {
+              // Consumer progress reporting must not interrupt a scanner run.
+            }
+          }
+        }
+
+        const workerResults = await Promise.allSettled(
+          Array.from({ length: Math.min(concurrency, normalizedSymbols.length) }, () =>
+            worker(),
+          ),
+        );
+        throwIfAborted(signal);
+
+        const rejectedWorker = workerResults.find(
+          ({ status }) => status === "rejected",
+        );
+
+        if (rejectedWorker) {
+          throw rejectedWorker.reason;
+        }
+
+        return clone(candidates);
+      } finally {
+        running = false;
+      }
+    },
+  };
+}
