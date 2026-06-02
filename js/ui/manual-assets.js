@@ -1,5 +1,6 @@
 import { safeText, snapshotArray } from "./dom.js";
 import { formatPrice } from "./format.js";
+import { recommendationBadge } from "./recommendation-badge.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -29,7 +30,7 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
   const recommendation = safeRead(asset, "recommendation", {});
   const plan = safeRead(recommendation, "plan", null);
   const split = safeRead(recommendation, "split", null);
-  const quality = safeText(safeRead(recommendation, "label"), "비추천");
+  const quality = recommendationBadge(safeRead(recommendation, "label"));
   const notes = snapshotArray(safeRead(recommendation, "notes", []), 3).values;
 
   const card = dom.el(

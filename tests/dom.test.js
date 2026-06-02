@@ -16,6 +16,7 @@ import { createDom, snapshotArray } from "../js/ui/dom.js";
 import { formatPrice } from "../js/ui/format.js";
 import { renderManualAssetCard, renderManualAssets } from "../js/ui/manual-assets.js";
 import { renderMarketChart, renderMarketDetail, renderMarketHeatmap } from "../js/ui/market.js";
+import { recommendationBadge } from "../js/ui/recommendation-badge.js";
 import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
 
@@ -335,24 +336,41 @@ test("renderers isolate hostile external rows and preserve safe content", () => 
   assert.equal(flattenText(auxiliary).includes("Regime"), true);
 });
 
-test("scanner results expose a one-click backtest action for each candidate", () => {
+test("scanner results show compact best setup rows without backtest actions", () => {
   const dom = createDom(createFakeDocument());
   const container = new FakeNode("section");
-  const selected = [];
 
   renderScannerResults(
     container,
-    [{ symbol: "HBAR", exchange: "Bybit", modeResults: {} }],
-    { dom, onBacktest: (symbol) => selected.push(symbol) },
+    [{
+      symbol: "HBAR",
+      price: 0.18,
+      status: "ready",
+      setups: {
+        scalp: {
+          mode: "scalp",
+          direction: "bull",
+          plan: { entryLow: 0.17, entryHigh: 0.18, sl: 0.16, tp: 0.21 },
+          recommendation: { label: "추천" },
+        },
+      },
+    }],
+    { dom },
   );
 
-  const [button] = findNodes(
-    container,
-    (node) => node.tagName === "button" && flattenText(node) === "Backtest",
-  );
-  assert.ok(button);
-  button.listeners.click();
-  assert.deepEqual(selected, ["HBAR"]);
+  const text = flattenText(container);
+  assert.match(text, /HBAR/);
+  assert.match(text, /0\.18/);
+  assert.match(text, /scalp/);
+  assert.match(text, /✅ 추천/);
+  assert.doesNotMatch(text, /Backtest/);
+  assert.doesNotMatch(text, /SymbolExchangeStatuscommonscalpdaydailyswingAction/);
+});
+
+test("recommendation badge maps every visible quality label", () => {
+  assert.equal(recommendationBadge("추천"), "✅ 추천");
+  assert.equal(recommendationBadge("주의"), "⚠️ 주의");
+  assert.equal(recommendationBadge("비추천"), "⛔ 비추천");
 });
 
 test("scanner results render expandable current setups for every timeframe", () => {
@@ -440,9 +458,8 @@ test("scanner split guidance separates entry stop loss and take profit blocks", 
   assert.equal(classes.includes("split-section split-entry"), true);
   assert.equal(classes.includes("split-section split-sl"), true);
   assert.equal(classes.includes("split-section split-tp"), true);
-  const [detailCell] = findNodes(container, (node) => node.attributes.class === "scanner-detail-cell");
-  assert.ok(detailCell);
-  assert.equal(detailCell.attributes.colspan, "8");
+  const [details] = findNodes(container, (node) => node.attributes.class === "scanner-setups");
+  assert.ok(details);
 });
 
 test("market heatmap renders theme scores and selectable asset tiles", () => {
@@ -658,7 +675,7 @@ test("renderers replace hostile collections with safe empty output", () => {
 
   const scanner = new FakeNode("section");
   assert.doesNotThrow(() => renderScannerResults(scanner, hostile, { dom }));
-  assert.equal(flattenText(scanner).includes("Symbol"), true);
+  assert.equal(flattenText(scanner).includes("종목"), true);
 
   const trades = new FakeNode("section");
   assert.doesNotThrow(() => renderBacktestResults(trades, hostile, { dom }));

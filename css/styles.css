@@ -64,6 +64,8 @@ h2 { margin-bottom: .25rem; }
 .split-entry { border-color: var(--cyan); }
 .split-sl { border-color: var(--red); color: var(--red); }
 .split-tp { border-color: var(--green); color: var(--green); }
+.recommendation-badge { font-weight: 800; }
+.compact-scanner-table td:last-child { min-width: 150px; }
 .heatmap-theme { margin-top: 1rem; }
 .heatmap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: .5rem; }
 .heatmap-tile { display: grid; gap: .15rem; text-align: left; }

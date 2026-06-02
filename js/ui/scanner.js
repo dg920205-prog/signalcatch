@@ -1,5 +1,7 @@
 import { safeText, snapshotArray } from "./dom.js";
 import { formatPrice } from "./format.js";
+import { selectStrongestSetup } from "../analysis/market-heatmap.js";
+import { recommendationBadge } from "./recommendation-badge.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -57,7 +59,7 @@ function renderSetupDetails(candidate, dom) {
         dom.el("td", {}, plan ? `${formatPrice(safeRead(plan, "entryLow"))} ~ ${formatPrice(safeRead(plan, "entryHigh"))}` : "-"),
         dom.el("td", {}, plan ? formatPrice(safeRead(plan, "sl")) : "-"),
         dom.el("td", {}, plan ? formatPrice(safeRead(plan, "tp")) : "-"),
-        dom.el("td", {}, safeText(safeRead(recommendation, "label"), "비추천")),
+        dom.el("td", {}, recommendationBadge(safeRead(recommendation, "label"))),
         dom.el("td", {}, renderSplit(safeRead(recommendation, "split", null), plan, dom)),
       ),
     );
@@ -86,35 +88,27 @@ function renderSetupDetails(candidate, dom) {
   );
 }
 
-export function renderScannerResults(container, candidates = [], { dom, onBacktest } = {}) {
+export function renderScannerResults(container, candidates = [], { dom } = {}) {
   dom.clear(container);
   const body = dom.el("tbody");
-  const hasBacktestAction = typeof onBacktest === "function";
   for (const candidate of snapshotArray(candidates).values) {
-    const modeResults = safeRead(candidate, "modeResults", {});
     const symbol = safeText(safeRead(candidate, "symbol"), "Unknown");
+    const bestSetup = selectStrongestSetup(safeRead(candidate, "setups", {}));
     dom.append(body, dom.el("tr", {},
       dom.el("td", {}, symbol),
-      dom.el("td", {}, safeText(safeRead(candidate, "exchange"), "Bybit")),
-      dom.el("td", {}, safeText(safeRead(candidate, "status"), "idle")),
-      ...MODES.map((mode) => dom.el("td", {}, safeRead(safeRead(modeResults, mode, {}), "eligible", false) ? "Signal" : "-")),
-      hasBacktestAction
-        ? dom.el("td", {}, dom.el("button", {
-            type: "button",
-            onClick: () => onBacktest(symbol),
-          }, "Backtest"))
-        : null,
-    ), dom.el("tr", { class: "scanner-detail-row" },
-      dom.el("td", { class: "scanner-detail-cell", colspan: hasBacktestAction ? 9 : 8 },
-        renderSetupDetails(candidate, dom),
-      ),
+      dom.el("td", {}, formatPrice(safeRead(candidate, "price"))),
+      dom.el("td", {}, safeText(safeRead(bestSetup, "mode"), "-")),
+      dom.el("td", {}, safeText(safeRead(bestSetup, "direction"), "neutral")),
+      dom.el("td", { class: "recommendation-badge" },
+        recommendationBadge(safeRead(safeRead(bestSetup, "recommendation", {}), "label"))),
+      dom.el("td", {}, renderSetupDetails(candidate, dom)),
     ));
   }
-  dom.append(container, dom.el("table", { class: "data-table" },
+  dom.append(container, dom.el("table", { class: "data-table compact-scanner-table" },
     dom.el("thead", {}, dom.el("tr", {},
-      dom.el("th", {}, "Symbol"), dom.el("th", {}, "Exchange"), dom.el("th", {}, "Status"),
-      ...MODES.map((mode) => dom.el("th", {}, mode)),
-      hasBacktestAction ? dom.el("th", {}, "Action") : null,
+      ...["종목", "현재가", "최고 추천 셋업", "방향", "추천 상태", "상세"].map((label) =>
+        dom.el("th", {}, label),
+      ),
     )),
     body,
   ));
