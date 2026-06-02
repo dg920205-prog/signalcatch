@@ -519,6 +519,11 @@ test("index exposes tab, progress, and backtest form accessibility contracts", a
   assert.match(html, /<label for="backtest-days">Preset days<\/label>/);
   assert.match(html, /<label for="backtest-symbols">Symbols<\/label>/);
   assert.match(html, /<input id="backtest-symbols"/);
+  assert.match(html, /<label for="recommendation-mode">Recommendation mode<select/);
+  assert.match(html, /<select id="recommendation-mode"/);
+  for (const mode of ["common", "scalp", "day", "daily", "swing"]) {
+    assert.match(html, new RegExp(`<option value="${mode}"`));
+  }
   for (const [mode, wait] of [["Common", 8], ["Scalp", 6], ["Day", 12], ["Daily", 6], ["Swing", 4]]) {
     assert.match(html, new RegExp(`${mode}<input name="wait${mode}" type="number" value="${wait}"`));
   }

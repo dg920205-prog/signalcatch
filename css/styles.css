@@ -42,6 +42,7 @@ h2 { margin-bottom: .25rem; }
 .tabs .is-active { border-color: var(--cyan); color: var(--cyan); background: #103457; }
 .panel { padding: 1rem; }
 .section-heading { justify-content: space-between; }
+.section-heading label { min-width: 180px; }
 .inline-form { margin-bottom: 1rem; }
 .inline-form label { min-width: 180px; }
 .asset-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

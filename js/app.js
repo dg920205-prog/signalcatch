@@ -14,19 +14,13 @@ import { dom } from "./ui/dom.js";
 import { renderManualAssets } from "./ui/manual-assets.js";
 import { renderScannerProgress, renderScannerResults } from "./ui/scanner.js";
 
-const modeByTab = {
-  manual: "common",
-  scanner: "day",
-  backtest: "daily",
-  auxiliary: "swing",
-};
-
 const elements = {
   apiStatus: document.querySelector("#api-status"),
   lastRefresh: document.querySelector("#last-refresh"),
   summaryGrid: document.querySelector("#summary-grid"),
   manualForm: document.querySelector("#manual-form"),
   manualGrid: document.querySelector("#manual-grid"),
+  recommendationMode: document.querySelector("#recommendation-mode"),
   dialog: document.querySelector("#settings-dialog"),
   openSettings: document.querySelector("#settings-open"),
   closeSettings: document.querySelector("#settings-close"),
@@ -84,11 +78,7 @@ function updateSummary(assets = [], tradeCount = 0) {
 }
 
 function enrichAssets(rawAssets) {
-  const activeTab =
-    document
-      .querySelector("[data-tab][aria-selected='true']")
-      ?.getAttribute("data-tab") ?? "manual";
-  const mode = modeByTab[activeTab] ?? "common";
+  const mode = elements.recommendationMode.value;
   return rawAssets.map((asset) => {
     const marketProfile = marketProfileById.get(asset.id) ?? { source: "fallback" };
     return {
@@ -294,6 +284,10 @@ function bindManualForm() {
   });
 }
 
+function bindRecommendationMode() {
+  elements.recommendationMode.addEventListener("change", rerender);
+}
+
 function bindBacktestForm() {
   elements.backtestForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -321,6 +315,7 @@ bindTabs();
 bindDialog();
 bindBacktestPresets();
 bindManualForm();
+bindRecommendationMode();
 bindBacktestForm();
 bindScanner();
 setApiStatus(elements.apiStatus, "idle", { dom });
