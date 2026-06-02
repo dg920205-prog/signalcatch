@@ -1,4 +1,5 @@
 import { safeText, snapshotArray } from "./dom.js";
+import { formatPrice } from "./format.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -8,12 +9,6 @@ function safeRead(value, key, fallback) {
   } catch {
     return fallback;
   }
-}
-
-function toPrice(value) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")
-    : "-";
 }
 
 function renderDiagnostic(diagnostic = {}, dom) {
@@ -71,9 +66,9 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
       dom.el(
         "div",
         { class: "plan-row" },
-        dom.el("span", {}, `진입 ${toPrice(plan.entryLow)} ~ ${toPrice(plan.entryHigh)}`),
-        dom.el("span", {}, `손절 ${toPrice(plan.sl)}`),
-        dom.el("span", {}, `목표 ${toPrice(plan.tp)}`),
+        dom.el("span", {}, `진입 ${formatPrice(plan.entryLow)} ~ ${formatPrice(plan.entryHigh)}`),
+        dom.el("span", {}, `손절 ${formatPrice(plan.sl)}`),
+        dom.el("span", {}, `목표 ${formatPrice(plan.tp)}`),
       ),
     );
   }
@@ -89,14 +84,14 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
           "p",
           {},
           `진입 ${split.entries
-            .map((entry) => `${entry.label} ${toPrice(entry.price)} (${entry.weightPct}%)`)
+            .map((entry) => `${entry.label} ${formatPrice(entry.price)} (${entry.weightPct}%)`)
             .join(", ")}`,
         ),
         dom.el(
           "p",
           {},
           `익절 ${split.targets
-            .map((target) => `${target.label} ${toPrice(target.price)} (${target.weightPct}%)`)
+            .map((target) => `${target.label} ${formatPrice(target.price)} (${target.weightPct}%)`)
             .join(", ")}`,
         ),
       ),

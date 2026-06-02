@@ -8,6 +8,7 @@ import {
 import {
   fetchBybitCandles,
   fetchBybitHistory,
+  fetchBybitMarketTickers,
   fetchBybitTopSymbols,
   fetchBybitTicker,
   normalizeBybitKlines,
@@ -473,6 +474,26 @@ test("fetchBybitTopSymbols rejects unsafe limits before fetching", async () => {
     },
   );
   assert.equal(fetchCalled, false);
+});
+
+test("fetchBybitMarketTickers returns safe USDT perpetual ticker snapshots", async () => {
+  await withFetchStub(
+    async () => new Response(JSON.stringify({
+      retCode: 0,
+      result: {
+        list: [
+          { symbol: "BTCUSDT", lastPrice: "69568.41", turnover24h: "1234", price24hPcnt: "0.0125" },
+          { symbol: "ETHUSD", lastPrice: "100", turnover24h: "200", price24hPcnt: "0.02" },
+          { symbol: "BADUSDT", lastPrice: null, turnover24h: "200", price24hPcnt: "0.02" },
+        ],
+      },
+    })),
+    async () => {
+      assert.deepEqual(await fetchBybitMarketTickers(), [
+        { symbol: "BTC", price: 69568.41, turnover24h: 1234, change24hPct: 1.25 },
+      ]);
+    },
+  );
 });
 
 test("fetches valid Bybit candles", async () => {

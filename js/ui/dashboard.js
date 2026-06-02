@@ -1,6 +1,6 @@
 import { safeText } from "./dom.js";
 
-const TABS = ["manual", "scanner", "backtest", "auxiliary"];
+const TABS = ["manual", "scanner", "market", "backtest"];
 
 function safeRead(value, key, fallback) {
   try {

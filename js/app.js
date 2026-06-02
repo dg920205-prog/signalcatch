@@ -1,5 +1,5 @@
 import { fetchBinanceCandles, fetchBinanceTicker } from "./api/binance.js";
-import { fetchBybitCandles, fetchBybitHistory, fetchBybitTicker, fetchBybitTopSymbols } from "./api/bybit.js";
+import { fetchBybitCandles, fetchBybitHistory, fetchBybitMarketTickers, fetchBybitTicker, fetchBybitTopSymbols } from "./api/bybit.js";
 import { createMarketProfileLoader } from "./analysis/market-profile.js";
 import { buildRecommendation } from "./analysis/recommendation.js";
 import { runBacktest } from "./backtest/engine.js";
@@ -7,11 +7,13 @@ import { groupSummaries, summarizeTrades } from "./backtest/metrics.js";
 import { buildModeJobs, partitionOosTrades, presetDateWindow, selectBybitSymbols } from "./backtest/workflow.js";
 import { MODE_CONFIG } from "./config.js";
 import { createManualAssetService } from "./services/manual-assets.js";
+import { createMarketService } from "./services/market.js";
 import { createScannerService } from "./services/scanner.js";
 import { buildBacktestRequest, downloadBacktestCsv, renderBacktestMetrics, renderEquityCurve, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
 import { dom } from "./ui/dom.js";
 import { renderManualAssets } from "./ui/manual-assets.js";
+import { renderMarketDetail, renderMarketHeatmap } from "./ui/market.js";
 import { renderScannerProgress, renderScannerResults } from "./ui/scanner.js";
 
 const elements = {
@@ -24,6 +26,8 @@ const elements = {
   dialog: document.querySelector("#settings-dialog"),
   openSettings: document.querySelector("#settings-open"),
   closeSettings: document.querySelector("#settings-close"),
+  openBacktest: document.querySelector("#settings-backtest-open"),
+  returnToMarket: document.querySelector("#backtest-return-market"),
   backtestDays: document.querySelector("#backtest-days"),
   backtestSymbols: document.querySelector("#backtest-symbols"),
   backtestForm: document.querySelector("#backtest-form"),
@@ -38,6 +42,9 @@ const elements = {
   scannerLimit: document.querySelector("#scanner-limit"),
   scannerProgress: document.querySelector("#scanner-progress"),
   scannerResults: document.querySelector("#scanner-results"),
+  marketRefresh: document.querySelector("#market-refresh"),
+  marketHeatmap: document.querySelector("#market-heatmap"),
+  marketDetail: document.querySelector("#market-detail"),
 };
 
 const marketProfileById = new Map();
@@ -63,8 +70,15 @@ const scannerService = createScannerService({
       fetchBybitCandles(symbol, { interval: MODE_CONFIG[mode].interval, limit: 250, signal }),
   },
 });
+const marketService = createMarketService({
+  bybit: {
+    fetchMarketTickers: fetchBybitMarketTickers,
+    fetchCandles: fetchBybitCandles,
+  },
+});
 let lastTrades = [];
 let lastScannerCandidates = [];
+let selectedMarketSymbol = null;
 
 function nowIso() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -273,6 +287,11 @@ async function runScannerCandidateBacktest(symbol) {
 function bindDialog() {
   elements.openSettings.addEventListener("click", () => elements.dialog.showModal());
   elements.closeSettings.addEventListener("click", () => elements.dialog.close());
+  elements.openBacktest.addEventListener("click", () => {
+    elements.dialog.close();
+    activateTab("backtest");
+  });
+  elements.returnToMarket.addEventListener("click", () => activateTab("market"));
 }
 
 function bindBacktestPresets() {
@@ -315,6 +334,39 @@ function bindScanner() {
   });
 }
 
+async function refreshMarket() {
+  setApiStatus(elements.apiStatus, "loading", { dom });
+  try {
+    const snapshot = await marketService.refresh();
+    renderMarketHeatmap(elements.marketHeatmap, snapshot.themes, {
+      dom,
+      onSelect: loadMarketDetail,
+    });
+    setApiStatus(elements.apiStatus, "ready", { dom });
+  } catch {
+    setApiStatus(elements.apiStatus, "error", { dom });
+  }
+}
+
+async function loadMarketDetail(symbol, timeframe = "4H") {
+  selectedMarketSymbol = symbol;
+  setApiStatus(elements.apiStatus, "loading", { dom });
+  try {
+    const detail = await marketService.loadDetail(symbol, timeframe);
+    renderMarketDetail(elements.marketDetail, detail, {
+      dom,
+      onTimeframe: (nextTimeframe) => loadMarketDetail(selectedMarketSymbol, nextTimeframe),
+    });
+    setApiStatus(elements.apiStatus, "ready", { dom });
+  } catch {
+    setApiStatus(elements.apiStatus, "error", { dom });
+  }
+}
+
+function bindMarket() {
+  elements.marketRefresh.addEventListener("click", refreshMarket);
+}
+
 bindTabs();
 bindDialog();
 bindBacktestPresets();
@@ -322,5 +374,6 @@ bindManualForm();
 bindRecommendationMode();
 bindBacktestForm();
 bindScanner();
+bindMarket();
 setApiStatus(elements.apiStatus, "idle", { dom });
 rerender();

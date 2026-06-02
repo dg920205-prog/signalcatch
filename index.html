@@ -35,8 +35,7 @@
       <nav class="tabs" role="tablist" aria-label="Dashboard views">
         <button id="manual-tab" type="button" role="tab" aria-controls="manual-panel" aria-selected="true" data-tab="manual">Manual assets</button>
         <button id="scanner-tab" type="button" role="tab" aria-controls="scanner-panel" aria-selected="false" data-tab="scanner">Scanner</button>
-        <button id="backtest-tab" type="button" role="tab" aria-controls="backtest-panel" aria-selected="false" data-tab="backtest">Backtest</button>
-        <button id="auxiliary-tab" type="button" role="tab" aria-controls="auxiliary-panel" aria-selected="false" data-tab="auxiliary">Auxiliary</button>
+        <button id="market-tab" type="button" role="tab" aria-controls="market-panel" aria-selected="false" data-tab="market">Market</button>
       </nav>
       <section id="manual-panel" class="panel" role="tabpanel" aria-labelledby="manual-tab" data-panel="manual">
         <div class="section-heading"><div><p class="eyebrow">WATCHLIST</p><h2>Manual assets</h2></div><label for="recommendation-mode">Recommendation mode<select id="recommendation-mode"><option value="common">Common</option><option value="scalp">Scalp</option><option value="day">Day</option><option value="daily">Daily</option><option value="swing">Swing</option></select></label></div>
@@ -53,8 +52,8 @@
         <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress><span>0 / 0</span></div>
         <div id="scanner-results" class="table-wrap"><p class="empty-state">Scanner results will appear here.</p></div>
       </section>
-      <section id="backtest-panel" class="panel" role="tabpanel" aria-labelledby="backtest-tab" data-panel="backtest" hidden>
-        <div class="section-heading"><div><p class="eyebrow">HISTORICAL TEST</p><h2>Backtest laboratory</h2></div></div>
+      <section id="backtest-panel" class="panel" role="tabpanel" aria-label="Backtest laboratory" data-panel="backtest" hidden>
+        <div class="section-heading"><div><p class="eyebrow">ADVANCED HISTORICAL TEST</p><h2>Backtest laboratory</h2></div><button id="backtest-return-market" type="button">Return to market</button></div>
         <form id="backtest-form" class="backtest-form">
           <fieldset><legend>Window</legend><div class="preset-row"><button type="button" data-preset-days="30">30d</button><button type="button" data-preset-days="90">90d</button><button type="button" data-preset-days="180">180d</button><button type="button" data-preset-days="365">365d</button></div><label for="backtest-days">Preset days</label><input id="backtest-days" name="presetDays" type="number" value="90" min="1" max="365"><label>Start<input name="startDate" type="date"></label><label>End<input name="endDate" type="date"></label></fieldset>
           <fieldset><legend>Costs</legend><label>Round-trip fee %<input name="roundTripFeePct" type="number" value="0.11" min="0" max="10" step="0.01"></label><label>Slippage %<input name="roundTripSlippagePct" type="number" value="0.20" min="0" max="10" step="0.01"></label></fieldset>
@@ -67,10 +66,11 @@
         <div class="split-grid"><section><h3>By symbol</h3><div id="symbol-summary" class="table-wrap"></div></section><section><h3>By mode</h3><div id="mode-summary" class="table-wrap"></div></section></div>
         <section><div class="section-heading"><h3>Trades</h3><button id="export-csv" type="button">Export CSV</button></div><div id="trade-results" class="table-wrap"></div></section>
       </section>
-      <section id="auxiliary-panel" class="panel" role="tabpanel" aria-labelledby="auxiliary-tab" data-panel="auxiliary" hidden>
-        <div class="section-heading"><div><p class="eyebrow">CONTEXT</p><h2>Auxiliary signals</h2></div></div>
-        <details class="auxiliary-item"><summary>Market regime</summary><p>Market context will appear after data is connected.</p></details>
-        <details class="auxiliary-item"><summary>Diagnostics</summary><p>Operational notes and safe diagnostic summaries will appear here.</p></details>
+      <section id="market-panel" class="panel" role="tabpanel" aria-labelledby="market-tab" data-panel="market" hidden>
+        <div class="section-heading"><div><p class="eyebrow">MARKET CONTEXT</p><h2>Theme heatmap and chart briefing</h2></div><button id="market-refresh" type="button">Refresh heatmap</button></div>
+        <p class="muted">Strength blends price change, 24-hour volume change, and recent 4-hour acceleration. It is a discovery score, not a trade promise.</p>
+        <div id="market-heatmap"><p class="empty-state">Refresh the market heatmap to begin.</p></div>
+        <section id="market-detail" class="market-detail"><p class="empty-state">Select a ready asset tile to open its chart briefing.</p></section>
       </section>
     </main>
     <dialog id="settings-dialog">
@@ -78,6 +78,7 @@
         <div class="section-heading"><h2>Settings</h2><button id="settings-close" type="button">Close</button></div>
         <label class="toggle"><input name="persist" type="checkbox"> Persist dashboard preferences on this device</label>
         <p class="muted">Persistence is opt-in. API data is not stored.</p>
+        <details class="auxiliary-item"><summary>Advanced tools</summary><button id="settings-backtest-open" type="button">Open backtest laboratory</button></details>
       </form>
     </dialog>
     <script type="module" src="js/app.js"></script>

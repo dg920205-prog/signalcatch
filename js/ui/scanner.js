@@ -1,4 +1,5 @@
 import { safeText, snapshotArray } from "./dom.js";
+import { formatPrice } from "./format.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -10,13 +11,7 @@ function safeRead(value, key, fallback) {
   }
 }
 
-function toPrice(value) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")
-    : "-";
-}
-
-function renderSplit(split, dom) {
+function renderSplit(split, plan, dom) {
   const entries = snapshotArray(safeRead(split, "entries", []), 3).values;
   const targets = snapshotArray(safeRead(split, "targets", []), 3).values;
   if (!entries.length || !targets.length) return null;
@@ -24,17 +19,22 @@ function renderSplit(split, dom) {
     "div",
     { class: "split-note" },
     dom.el(
-      "span",
-      {},
+      "div",
+      { class: "split-section split-entry" },
       `분할 진입 ${entries.map((entry) =>
-        `${safeText(safeRead(entry, "label"), "-")} ${toPrice(safeRead(entry, "price"))} (${safeText(safeRead(entry, "weightPct"), "-")}%)`,
+        `${safeText(safeRead(entry, "label"), "-")} ${formatPrice(safeRead(entry, "price"))} (${safeText(safeRead(entry, "weightPct"), "-")}%)`,
       ).join(", ")}`,
     ),
     dom.el(
-      "span",
-      {},
+      "div",
+      { class: "split-section split-sl" },
+      `SL ${formatPrice(safeRead(plan, "sl"))}`,
+    ),
+    dom.el(
+      "div",
+      { class: "split-section split-tp" },
       `분할 TP ${targets.map((target) =>
-        `${safeText(safeRead(target, "label"), "-")} ${toPrice(safeRead(target, "price"))} (${safeText(safeRead(target, "weightPct"), "-")}%)`,
+        `${safeText(safeRead(target, "label"), "-")} ${formatPrice(safeRead(target, "price"))} (${safeText(safeRead(target, "weightPct"), "-")}%)`,
       ).join(", ")}`,
     ),
   );
@@ -54,11 +54,11 @@ function renderSetupDetails(candidate, dom) {
         {},
         dom.el("td", {}, mode),
         dom.el("td", {}, safeText(safeRead(setup, "direction"), "neutral")),
-        dom.el("td", {}, plan ? `${toPrice(safeRead(plan, "entryLow"))} ~ ${toPrice(safeRead(plan, "entryHigh"))}` : "-"),
-        dom.el("td", {}, plan ? toPrice(safeRead(plan, "sl")) : "-"),
-        dom.el("td", {}, plan ? toPrice(safeRead(plan, "tp")) : "-"),
+        dom.el("td", {}, plan ? `${formatPrice(safeRead(plan, "entryLow"))} ~ ${formatPrice(safeRead(plan, "entryHigh"))}` : "-"),
+        dom.el("td", {}, plan ? formatPrice(safeRead(plan, "sl")) : "-"),
+        dom.el("td", {}, plan ? formatPrice(safeRead(plan, "tp")) : "-"),
         dom.el("td", {}, safeText(safeRead(recommendation, "label"), "비추천")),
-        dom.el("td", {}, renderSplit(safeRead(recommendation, "split", null), dom)),
+        dom.el("td", {}, renderSplit(safeRead(recommendation, "split", null), plan, dom)),
       ),
     );
   }
@@ -66,7 +66,7 @@ function renderSetupDetails(candidate, dom) {
     "details",
     { class: "scanner-setups" },
     dom.el("summary", {}, "현재 셋업 보기"),
-    dom.el("p", { class: "muted" }, `현재가 ${toPrice(safeRead(candidate, "price"))}`),
+    dom.el("p", { class: "muted" }, `현재가 ${formatPrice(safeRead(candidate, "price"))}`),
     dom.el(
       "table",
       { class: "data-table setup-table" },
@@ -94,7 +94,7 @@ export function renderScannerResults(container, candidates = [], { dom, onBackte
     const modeResults = safeRead(candidate, "modeResults", {});
     const symbol = safeText(safeRead(candidate, "symbol"), "Unknown");
     dom.append(body, dom.el("tr", {},
-      dom.el("td", {}, symbol, renderSetupDetails(candidate, dom)),
+      dom.el("td", {}, symbol),
       dom.el("td", {}, safeText(safeRead(candidate, "exchange"), "Bybit")),
       dom.el("td", {}, safeText(safeRead(candidate, "status"), "idle")),
       ...MODES.map((mode) => dom.el("td", {}, safeRead(safeRead(modeResults, mode, {}), "eligible", false) ? "Signal" : "-")),
@@ -104,6 +104,10 @@ export function renderScannerResults(container, candidates = [], { dom, onBackte
             onClick: () => onBacktest(symbol),
           }, "Backtest"))
         : null,
+    ), dom.el("tr", { class: "scanner-detail-row" },
+      dom.el("td", { class: "scanner-detail-cell", colspan: hasBacktestAction ? 9 : 8 },
+        renderSetupDetails(candidate, dom),
+      ),
     ));
   }
   dom.append(container, dom.el("table", { class: "data-table" },

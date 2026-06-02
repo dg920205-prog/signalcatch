@@ -13,6 +13,9 @@ SignalCatch is a free static crypto-signal dashboard for GitHub Pages. It uses p
 - Daily and swing backtests simulate three split entries and three split targets with the default split profile
 - Scanner default: top `100` Bybit USDT perpetuals by 24-hour turnover, editable from `10` to `200`
 - Scanner setup details: current price plus every timeframe's direction, entry zone, SL, TP, recommendation, and available split guidance
+- Market workflow: fixed-theme heatmap, turnover-weighted discovery score, lightweight `1H / 4H / 1D` chart, and analysis briefing
+- Backtest laboratory: retained as an optional advanced tool inside Settings instead of the primary navigation
+- Displayed prices use thousands separators and at most four decimal places for readability
 
 ## Local Preview
 

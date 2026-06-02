@@ -33,6 +33,9 @@ This phase prioritizes delivery with safe fallbacks. The items below capture kno
 13. Replace the temporary seven-symbol scanner with a Bybit turnover-ranked top-N universe and seven-symbol API fallback.
 14. Display expandable current-price setups for every scanner timeframe, including entry zone, SL, TP, and available split guidance.
 15. Add an in-page usage guide that positions backtesting as an optional secondary check.
+16. Format prices to at most four decimal places and separate split entry, SL, and TP guidance visually.
+17. Move the historical backtest laboratory behind Settings as an optional advanced tool.
+18. Replace the unfinished auxiliary surface with a fixed-theme market heatmap and lightweight chart briefing.
 
 ## Risk Notes
 

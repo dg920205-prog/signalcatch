@@ -1,7 +1,7 @@
 import { STORAGE_KEY } from "./config.js";
 import { normalizeBaseSymbol } from "./core/symbols.js";
 
-const ACTIVE_TABS = new Set(["manual", "scanner", "backtest", "auxiliary"]);
+const ACTIVE_TABS = new Set(["manual", "scanner", "market"]);
 const MODES = new Set(["common", "scalp", "day", "daily", "swing"]);
 const EXCHANGES = new Set(["bybit", "binance"]);
 

@@ -57,8 +57,29 @@ h2 { margin-bottom: .25rem; }
 .progress-row { margin: 1rem 0; }
 .toolbar input { width: 110px; }
 .scanner-setups { margin-top: .4rem; }
+.scanner-detail-cell { padding: .35rem .65rem .8rem; background: rgba(7, 20, 38, .45); }
 .setup-table { margin-top: .4rem; font-size: .8rem; }
 .split-note { display: grid; gap: .2rem; min-width: 250px; white-space: normal; }
+.split-section { border-left: 3px solid var(--line); padding: .2rem .45rem; }
+.split-entry { border-color: var(--cyan); }
+.split-sl { border-color: var(--red); color: var(--red); }
+.split-tp { border-color: var(--green); color: var(--green); }
+.heatmap-theme { margin-top: 1rem; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: .5rem; }
+.heatmap-tile { display: grid; gap: .15rem; text-align: left; }
+.strength-badge { border-radius: 999px; padding: .15rem .5rem; font-size: .75rem; }
+.strength-strong { border-color: var(--green); color: var(--green); }
+.strength-neutral { border-color: var(--yellow); color: var(--yellow); }
+.strength-weak { border-color: var(--red); color: var(--red); }
+.market-detail { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.timeframe-row { display: flex; gap: .35rem; }
+.timeframe-row .is-active { border-color: var(--cyan); color: var(--cyan); }
+.market-chart { margin: .8rem 0; }
+.chart-price { stroke: var(--cyan); }
+.chart-short-average { stroke: var(--green); stroke-width: 2; }
+.chart-long-average { stroke: var(--yellow); stroke-width: 2; }
+.briefing-card, .market-setup-card { display: grid; gap: .4rem; border: 1px solid var(--line); border-radius: 8px; padding: .8rem; background: var(--navy-900); }
+.other-setup-grid { display: grid; gap: .5rem; margin-top: .5rem; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 progress { width: min(540px, 100%); accent-color: var(--cyan); }
 .table-wrap { max-width: 100%; overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; }
@@ -85,4 +106,16 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
   .app-header { align-items: flex-start; flex-direction: column; }
   .summary-grid, .asset-grid, .metrics-grid, .backtest-form, .split-grid { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .setup-table, .setup-table tbody, .setup-table tr, .setup-table td { display: block; width: 100%; }
+  .setup-table thead { display: none; }
+  .setup-table tr { padding: .45rem 0; border-bottom: 1px solid var(--line); }
+  .setup-table td { padding: .18rem .35rem; border-bottom: 0; white-space: normal; }
+  .setup-table td::before { margin-right: .4rem; color: var(--cyan); font-weight: 800; }
+  .setup-table td:nth-child(1)::before { content: "모드"; }
+  .setup-table td:nth-child(2)::before { content: "방향"; }
+  .setup-table td:nth-child(3)::before { content: "진입"; }
+  .setup-table td:nth-child(4)::before { content: "SL"; }
+  .setup-table td:nth-child(5)::before { content: "TP"; }
+  .setup-table td:nth-child(6)::before { content: "추천"; }
+  .split-note { min-width: 0; }
 }

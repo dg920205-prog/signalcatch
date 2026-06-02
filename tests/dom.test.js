@@ -13,7 +13,9 @@ import {
 } from "../js/ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary } from "../js/ui/dashboard.js";
 import { createDom, snapshotArray } from "../js/ui/dom.js";
+import { formatPrice } from "../js/ui/format.js";
 import { renderManualAssetCard, renderManualAssets } from "../js/ui/manual-assets.js";
+import { renderMarketDetail, renderMarketHeatmap } from "../js/ui/market.js";
 import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
 
@@ -378,6 +380,105 @@ test("scanner results render expandable current setups for every timeframe", () 
   assert.equal(text.includes("분할 TP TP1 104 (40%)"), true);
 });
 
+test("formats prices with grouping and at most four decimal places", () => {
+  assert.equal(formatPrice(69568.41129), "69,568.4113");
+  assert.equal(formatPrice(0.629234), "0.6292");
+  assert.equal(formatPrice(70024), "70,024");
+});
+
+test("scanner split guidance separates entry stop loss and take profit blocks", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const setup = {
+    mode: "daily",
+    direction: "bull",
+    plan: { entryLow: 0.61790407, entryHigh: 0.6292, sl: 0.5940737, tp: 0.68188946 },
+    recommendation: {
+      label: "추천",
+      split: {
+        entries: [{ label: "E1", price: 0.61790407, weightPct: 25 }],
+        targets: [{ label: "TP1", price: 0.68188946, weightPct: 50 }],
+      },
+    },
+  };
+
+  renderScannerResults(
+    container,
+    [{ symbol: "JTO", exchange: "Bybit", status: "ready", price: 0.629234, modeResults: {}, setups: { daily: setup } }],
+    { dom },
+  );
+
+  const classes = findNodes(container, (node) => node.attributes.class)
+    .map((node) => node.attributes.class);
+  const text = flattenText(container);
+  assert.equal(text.includes("0.6292"), true);
+  assert.equal(classes.includes("split-section split-entry"), true);
+  assert.equal(classes.includes("split-section split-sl"), true);
+  assert.equal(classes.includes("split-section split-tp"), true);
+  const [detailCell] = findNodes(container, (node) => node.attributes.class === "scanner-detail-cell");
+  assert.ok(detailCell);
+  assert.equal(detailCell.attributes.colspan, "8");
+});
+
+test("market heatmap renders theme scores and selectable asset tiles", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const selected = [];
+  renderMarketHeatmap(
+    container,
+    { Major: { theme: "Major", score: 42, label: "Strong", tiles: [{ symbol: "BTC", score: 55, label: "Strong", status: "ready" }] } },
+    { dom, onSelect: (symbol) => selected.push(symbol) },
+  );
+
+  const text = flattenText(container);
+  assert.equal(text.includes("Major"), true);
+  assert.equal(text.includes("Strong"), true);
+  const [tile] = findNodes(container, (node) => node.tagName === "button" && node.attributes.class === "heatmap-tile strength-strong");
+  assert.ok(tile);
+  tile.listeners.click();
+  assert.deepEqual(selected, ["BTC"]);
+});
+
+test("market detail renders timeframe controls chart briefing and strongest setup", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const selected = [];
+  renderMarketDetail(
+    container,
+    {
+      symbol: "BTC",
+      timeframe: "4H",
+      briefing: "BTC 분석 코멘트",
+      chart: {
+        prices: [{ time: 1, value: 100 }, { time: 2, value: 102 }],
+        shortAverage: [null, 101],
+        longAverage: [null, 100.5],
+      },
+      setup: {
+        mode: "daily",
+        direction: "bull",
+        plan: { entryLow: 99, entryHigh: 101, sl: 95, tp: 110 },
+        recommendation: { label: "추천" },
+      },
+      setups: {},
+    },
+    { dom, onTimeframe: (timeframe) => selected.push(timeframe) },
+  );
+
+  const text = flattenText(container);
+  assert.equal(text.includes("BTC 분석 코멘트"), true);
+  assert.equal(text.includes("추천 셋업"), true);
+  assert.equal(text.includes("진입 99 ~ 101"), true);
+  assert.equal(text.includes("SL 95"), true);
+  assert.equal(text.includes("TP 110"), true);
+  assert.equal(text.includes("Other timeframe setups"), true);
+  assert.equal(findNodes(container, (node) => node.tagName === "svg").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "chart-price").length, 1);
+  const [oneHour] = findNodes(container, (node) => node.tagName === "button" && flattenText(node) === "1H");
+  oneHour.listeners.click();
+  assert.deepEqual(selected, ["1H"]);
+});
+
 test("metric renderer uses safe fallbacks for hostile getters", () => {
   const dom = createDom(createFakeDocument());
   const container = new FakeNode("section");
@@ -610,14 +711,22 @@ test("strict backtest collections reject accessors and inherited indexes while r
   }
 });
 
-test("index exposes tab, progress, and backtest form accessibility contracts", async () => {
+test("index exposes primary market navigation and hidden advanced backtest contracts", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 
   assert.match(html, /<nav class="tabs" role="tablist"/);
-  for (const tab of ["manual", "scanner", "backtest", "auxiliary"]) {
+  for (const tab of ["manual", "scanner", "market"]) {
     assert.match(html, new RegExp(`id="${tab}-tab"[^>]*role="tab"[^>]*aria-controls="${tab}-panel"[^>]*aria-selected="(?:true|false)"`));
     assert.match(html, new RegExp(`id="${tab}-panel"[^>]*role="tabpanel"[^>]*aria-labelledby="${tab}-tab"`));
   }
+  assert.doesNotMatch(html, /id="backtest-tab"/);
+  assert.doesNotMatch(html, /id="auxiliary-tab"/);
+  assert.match(html, /id="backtest-panel"[^>]*role="tabpanel"[^>]*data-panel="backtest"[^>]*hidden/);
+  assert.match(html, /id="settings-backtest-open"[^>]*>Open backtest laboratory<\/button>/);
+  assert.match(html, /id="backtest-return-market"[^>]*>Return to market<\/button>/);
+  assert.match(html, /id="market-refresh"[^>]*>Refresh heatmap<\/button>/);
+  assert.match(html, /id="market-heatmap"/);
+  assert.match(html, /id="market-detail"/);
   assert.match(html, /<progress id="scanner-progress"[^>]*role="progressbar"[^>]*aria-label="Scanner progress"/);
   assert.match(html, /<label for="scanner-limit">Top symbols<\/label>/);
   assert.match(html, /<input id="scanner-limit" name="scannerLimit" type="number" value="100" min="10" max="200"/);
@@ -638,12 +747,12 @@ test("index exposes tab, progress, and backtest form accessibility contracts", a
 });
 
 test("tab controller updates aria state, visibility, and arrow-key focus", () => {
-  const buttons = ["manual", "scanner", "backtest", "auxiliary"].map((tab) => {
+  const buttons = ["manual", "scanner", "market"].map((tab) => {
     const button = new FakeNode("button");
     button.setAttribute("data-tab", tab);
     return button;
   });
-  const panels = ["manual", "scanner", "backtest", "auxiliary"].map((tab) => {
+  const panels = ["manual", "scanner", "market", "backtest"].map((tab) => {
     const panel = new FakeNode("section");
     panel.setAttribute("data-panel", tab);
     return panel;
@@ -663,4 +772,6 @@ test("tab controller updates aria state, visibility, and arrow-key focus", () =>
   buttons[1].listeners.keydown({ key: "ArrowRight", preventDefault() {} });
   assert.equal(buttons[2].focused, true);
   assert.equal(buttons[2].getAttribute("aria-selected"), "true");
+  assert.equal(activateTab("backtest", root), true);
+  assert.equal(panels[3].hidden, false);
 });

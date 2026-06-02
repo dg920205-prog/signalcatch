@@ -262,6 +262,32 @@ export async function fetchBybitTopSymbols({ limit = 100 } = {}) {
     .map(({ symbol }) => symbol.slice(0, -"USDT".length));
 }
 
+export async function fetchBybitMarketTickers() {
+  const tickers = requireBybitList(
+    await fetchJson(createUrl("/v5/market/tickers", { category: "linear" }), {
+      exchange: EXCHANGE,
+      operation: "market heatmap",
+    }),
+    "market heatmap",
+  );
+
+  return tickers.flatMap((ticker) => {
+    try {
+      if (typeof ticker?.symbol !== "string" || !ticker.symbol.endsWith("USDT")) {
+        return [];
+      }
+      return [{
+        symbol: ticker.symbol.slice(0, -"USDT".length),
+        price: toPositiveNumber(ticker.lastPrice, "market heatmap"),
+        turnover24h: toFiniteNumber(ticker.turnover24h, "market heatmap"),
+        change24hPct: toFiniteNumber(ticker.price24hPcnt, "market heatmap") * 100,
+      }];
+    } catch {
+      return [];
+    }
+  });
+}
+
 export async function fetchBybitCandles(
   input,
   { interval = "60", limit = 200, start, end } = {},
