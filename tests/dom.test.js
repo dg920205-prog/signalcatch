@@ -78,6 +78,13 @@ function flattenText(node) {
   return [node.textContent, ...node.childNodes.flatMap(flattenText)].join("");
 }
 
+function findNodes(node, predicate) {
+  return [
+    ...(predicate(node) ? [node] : []),
+    ...node.childNodes.flatMap((child) => findNodes(child, predicate)),
+  ];
+}
+
 test("setText preserves HTML-looking content as literal text", () => {
   const dom = createDom(createFakeDocument());
   const node = new FakeNode("p");
@@ -297,6 +304,26 @@ test("renderers isolate hostile external rows and preserve safe content", () => 
   const auxiliary = new FakeNode("section");
   renderAuxiliary(auxiliary, [{ title: "Regime", reason: "Neutral" }, hostile], { dom });
   assert.equal(flattenText(auxiliary).includes("Regime"), true);
+});
+
+test("scanner results expose a one-click backtest action for each candidate", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const selected = [];
+
+  renderScannerResults(
+    container,
+    [{ symbol: "HBAR", exchange: "Bybit", modeResults: {} }],
+    { dom, onBacktest: (symbol) => selected.push(symbol) },
+  );
+
+  const [button] = findNodes(
+    container,
+    (node) => node.tagName === "button" && flattenText(node) === "Backtest",
+  );
+  assert.ok(button);
+  button.listeners.click();
+  assert.deepEqual(selected, ["HBAR"]);
 });
 
 test("metric renderer uses safe fallbacks for hostile getters", () => {

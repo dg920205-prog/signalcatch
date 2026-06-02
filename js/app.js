@@ -9,7 +9,7 @@ import { MODE_CONFIG } from "./config.js";
 import { createManualAssetService } from "./services/manual-assets.js";
 import { createScannerService } from "./services/scanner.js";
 import { buildBacktestRequest, exportBacktestCsv, renderBacktestMetrics, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
-import { bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
+import { activateTab, bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
 import { dom } from "./ui/dom.js";
 import { renderManualAssets } from "./ui/manual-assets.js";
 import { renderScannerProgress, renderScannerResults } from "./ui/scanner.js";
@@ -31,6 +31,7 @@ const elements = {
   openSettings: document.querySelector("#settings-open"),
   closeSettings: document.querySelector("#settings-close"),
   backtestDays: document.querySelector("#backtest-days"),
+  backtestSymbols: document.querySelector("#backtest-symbols"),
   backtestForm: document.querySelector("#backtest-form"),
   backtestRunCard: document.querySelector("#backtest-run-card"),
   backtestMetrics: document.querySelector("#backtest-metrics"),
@@ -242,12 +243,30 @@ async function runScannerFlow() {
         renderScannerProgress(elements.scannerProgress, { completed, total }, { dom }),
     });
     lastScannerCandidates = candidates;
-    renderScannerResults(elements.scannerResults, candidates, { dom });
+    renderScannerResults(elements.scannerResults, candidates, {
+      dom,
+      onBacktest: runScannerCandidateBacktest,
+    });
     setApiStatus(elements.apiStatus, "ready", { dom });
     rerender();
   } catch {
     setApiStatus(elements.apiStatus, "error", { dom });
   }
+}
+
+async function runScannerCandidateBacktest(symbol) {
+  elements.backtestSymbols.value = symbol;
+  if (
+    !elements.backtestForm.elements.startDate.value ||
+    !elements.backtestForm.elements.endDate.value
+  ) {
+    const { startDate, endDate } = presetDateWindow(Number(elements.backtestDays.value));
+    elements.backtestForm.elements.startDate.value = startDate;
+    elements.backtestForm.elements.endDate.value = endDate;
+  }
+  activateTab("backtest");
+  elements.backtestSymbols.focus();
+  await runBacktestFlow();
 }
 
 function bindDialog() {
