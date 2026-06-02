@@ -143,6 +143,7 @@ function validateBacktestInput({
   classify,
   makePlan,
   symbol,
+  allowOverlapping,
 }) {
   if (
     !Array.isArray(candles) ||
@@ -155,7 +156,8 @@ function validateBacktestInput({
     typeof analyze !== "function" ||
     typeof classify !== "function" ||
     typeof makePlan !== "function" ||
-    typeof symbol !== "string"
+    typeof symbol !== "string" ||
+    typeof allowOverlapping !== "boolean"
   ) {
     throw new TypeError("Invalid backtest input");
   }
@@ -171,6 +173,7 @@ export function runBacktest({
   classify = classifyModes,
   makePlan = buildTradePlan,
   symbol = "",
+  allowOverlapping = false,
 } = {}) {
   validateBacktestInput({
     candles,
@@ -182,16 +185,18 @@ export function runBacktest({
     classify,
     makePlan,
     symbol,
+    allowOverlapping,
   });
 
   const results = [];
   const costPct = feePct + slippagePct;
+  let blockedThroughIndex = -1;
 
   for (let index = 0; index < candles.length; index += 1) {
     const analysis = analyze(candles.slice(0, index + 1));
     const modes = classify(analysis);
 
-    if (!modes?.[mode]?.eligible) {
+    if (!modes?.[mode]?.eligible || (!allowOverlapping && index <= blockedThroughIndex)) {
       continue;
     }
 
@@ -205,18 +210,27 @@ export function runBacktest({
       continue;
     }
 
+    const simulated = simulatePlannedTrade({
+      plan,
+      futureCandles: candles.slice(index + 1),
+      waitCandles,
+      costPct,
+    });
+
     results.push({
       symbol,
       mode,
       signalIndex: index,
       signalTime: candles[index].time,
-      ...simulatePlannedTrade({
-        plan,
-        futureCandles: candles.slice(index + 1),
-        waitCandles,
-        costPct,
-      }),
+      ...simulated,
     });
+
+    if (!allowOverlapping) {
+      blockedThroughIndex =
+        simulated.status === "open"
+          ? Number.POSITIVE_INFINITY
+          : index + (simulated.status === "unfilled" ? waitCandles : simulated.holdCandles + 1);
+    }
   }
 
   return results;

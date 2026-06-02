@@ -160,12 +160,15 @@ export function buildBacktestRequest(formState = {}) {
 
 export function renderExecutionCard(container, run = {}, { dom }) {
   dom.clear(container);
+  const oosMetrics = safeRead(run, "oosMetrics", {});
   const entries = [
     ["기간", `${safeText(run.startDate, "-")} ~ ${safeText(run.endDate, "-")}`],
     ["심볼", safeText(run.symbolsText, "-")],
     ["모드", safeText(run.modesText, "-")],
     ["데이터 소스", safeText(run.dataSource, "Bybit 기준 임시 산정")],
     ["OOS", safeText(run.oosLabel, "미적용")],
+    ["OOS 승률 ", `${safeText(safeRead(oosMetrics, "winRatePct"), 0)}%`],
+    ["OOS 수익률 ", `${safeText(safeRead(oosMetrics, "compoundedReturnPct"), 0)}%`],
   ];
   dom.append(
     container,

@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   buildBacktestRequest,
+  renderExecutionCard,
   renderBacktestMetrics,
   renderBacktestResults,
   renderTrades,
@@ -305,6 +306,25 @@ test("metric renderer uses safe fallbacks for hostile getters", () => {
 
   assert.doesNotThrow(() => renderBacktestMetrics(container, metrics, { dom }));
   assert.equal(flattenText(container).includes("Closed trades"), true);
+});
+
+test("execution card renders separate OOS metrics", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+
+  renderExecutionCard(
+    container,
+    {
+      oosLabel: "In 12 / OOS 3",
+      oosMetrics: { closedTrades: 2, winRatePct: 50, compoundedReturnPct: 1.25 },
+    },
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.equal(text.includes("In 12 / OOS 3"), true);
+  assert.equal(text.includes("OOS 승률 50%"), true);
+  assert.equal(text.includes("OOS 수익률 1.25%"), true);
 });
 
 test("summary renderer uses safe fallbacks for hostile getters", () => {

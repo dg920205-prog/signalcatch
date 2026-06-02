@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildRecommendation } from "../js/analysis/recommendation.js";
+import { buildRecommendation, calculateTurnoverSharePct } from "../js/analysis/recommendation.js";
 
 const analysis = {
   direction: "bull",
@@ -34,4 +34,15 @@ test("buildRecommendation falls back when profile data is missing", () => {
 
   assert.equal(result.label, "주의");
   assert.equal(result.notes[0], "Bybit 기준 임시 산정");
+});
+
+test("calculateTurnoverSharePct uses Bybit turnover share instead of rank proxy", () => {
+  assert.equal(
+    calculateTurnoverSharePct("HBARUSDT", [
+      { symbol: "BTCUSDT", turnover24h: "700" },
+      { symbol: "HBARUSDT", turnover24h: "200" },
+      { symbol: "ETHUSDT", turnover24h: "100" },
+    ]),
+    20,
+  );
 });

@@ -1,8 +1,9 @@
 import { fetchBinanceCandles, fetchBinanceTicker } from "./api/binance.js";
 import { fetchBybitCandles, fetchBybitHistory, fetchBybitTicker } from "./api/bybit.js";
-import { buildRecommendation } from "./analysis/recommendation.js";
+import { buildRecommendation, calculateTurnoverSharePct } from "./analysis/recommendation.js";
 import { runBacktest } from "./backtest/engine.js";
 import { groupSummaries, summarizeTrades } from "./backtest/metrics.js";
+import { buildModeJobs, partitionOosTrades, presetDateWindow, selectBybitSymbols } from "./backtest/workflow.js";
 import { MODE_CONFIG } from "./config.js";
 import { createManualAssetService } from "./services/manual-assets.js";
 import { createScannerService } from "./services/scanner.js";
@@ -88,13 +89,15 @@ async function fetchMarketProfile(symbol) {
   };
   try {
     const turnover = await fetch(
-      `https://api.bybit.com/v5/market/tickers?category=linear&symbol=${encodeURIComponent(symbol)}USDT`,
+      "https://api.bybit.com/v5/market/tickers?category=linear",
     ).then((res) => res.json());
-    const ticker = turnover?.result?.list?.[0];
+    const tickers = turnover?.result?.list ?? [];
+    const ticker = tickers.find((item) => item?.symbol === `${symbol}USDT`);
     const turnover24h = Number(ticker?.turnover24h);
     if (Number.isFinite(turnover24h) && turnover24h >= 0) {
       profile.turnover24h = turnover24h;
     }
+    profile.bybitSharePct = calculateTurnoverSharePct(`${symbol}USDT`, tickers);
   } catch {}
   try {
     const [coin, global] = await Promise.all([
@@ -105,12 +108,8 @@ async function fetchMarketProfile(symbol) {
     ]);
     const marketCap = Number(coin?.[0]?.market_cap);
     const totalCap = Number(global?.data?.total_market_cap?.usd);
-    const rank = Number(coin?.[0]?.market_cap_rank);
     if (Number.isFinite(marketCap) && Number.isFinite(totalCap) && totalCap > 0) {
       profile.marketCapSharePct = (marketCap / totalCap) * 100;
-    }
-    if (Number.isFinite(rank) && rank > 0) {
-      profile.bybitSharePct = 100 / rank;
     }
     if (profile.marketCapSharePct !== null) {
       profile.source = "full";
@@ -164,7 +163,7 @@ async function addManualAsset(form) {
 
 function readBacktestFormState() {
   const formData = new FormData(elements.backtestForm);
-  const manualSymbols = manualService.list().map((asset) => asset.symbol);
+  const manualSymbols = selectBybitSymbols(manualService.list());
   const typedSymbols = String(formData.get("symbols") ?? "")
     .split(",")
     .map((value) => value.trim())
@@ -197,35 +196,42 @@ async function runBacktestFlow() {
     const trades = [];
     let inSampleTrades = 0;
     let outSampleTrades = 0;
+    const inSample = [];
+    const outOfSample = [];
 
     for (const symbol of request.symbols) {
-      const candles = await fetchBybitHistory(symbol, {
-        interval: "60",
-        start: startMs,
-        end: endMs,
-        limit: 500,
-      });
-      for (const mode of request.modes) {
+      const jobs = buildModeJobs(
+        request.modes,
+        Object.fromEntries(
+          Object.entries(MODE_CONFIG).map(([mode, config]) => [
+            mode,
+            { ...config, waitCandles: request.waitCandles[mode] },
+          ]),
+        ),
+      );
+      for (const { mode, interval, waitCandles } of jobs) {
+        const candles = await fetchBybitHistory(symbol, {
+          interval,
+          start: startMs,
+          end: endMs,
+          limit: 500,
+        });
         const modeTrades = runBacktest({
           candles,
           symbol,
           mode,
-          waitCandles: request.waitCandles[mode],
+          waitCandles,
           feePct: request.roundTripFeePct,
           slippagePct: request.roundTripSlippagePct,
         });
-        const splitIndex = Math.max(0, Math.floor(candles.length * 0.8) - 1);
-        for (const trade of modeTrades) {
-          const oosBucket = trade.signalIndex > splitIndex ? "out-of-sample" : "in-sample";
-          if (oosBucket === "out-of-sample") {
-            outSampleTrades += 1;
-          } else {
-            inSampleTrades += 1;
-          }
-          trades.push({ ...trade, oosBucket });
-        }
+        const partition = partitionOosTrades(modeTrades, candles.length);
+        inSample.push(...partition.inSample);
+        outOfSample.push(...partition.outOfSample);
+        trades.push(...partition.inSample, ...partition.outOfSample);
       }
     }
+    inSampleTrades = inSample.length;
+    outSampleTrades = outOfSample.length;
 
     lastTrades = trades;
     const summary = summarizeTrades(trades);
@@ -247,6 +253,7 @@ async function runBacktestFlow() {
         modesText: request.modes.join(", "),
         dataSource: sources.has("full") ? "전체 데이터 반영" : "Bybit 기준 임시 산정",
         oosLabel: `In ${inSampleTrades} / OOS ${outSampleTrades}`,
+        oosMetrics: summarizeTrades(outOfSample),
       },
       { dom },
     );
@@ -287,7 +294,11 @@ function bindDialog() {
 function bindBacktestPresets() {
   for (const button of document.querySelectorAll("[data-preset-days]")) {
     button.addEventListener("click", () => {
-      elements.backtestDays.value = button.getAttribute("data-preset-days");
+      const days = Number(button.getAttribute("data-preset-days"));
+      const { startDate, endDate } = presetDateWindow(days);
+      elements.backtestDays.value = String(days);
+      elements.backtestForm.elements.startDate.value = startDate;
+      elements.backtestForm.elements.endDate.value = endDate;
     });
   }
 }

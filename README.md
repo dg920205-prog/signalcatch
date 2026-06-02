@@ -1,0 +1,41 @@
+# SignalCatch
+
+SignalCatch is a free static crypto-signal dashboard for GitHub Pages. It uses public REST APIs only and does not require a backend, account, API key, or database.
+
+## Feature Boundary
+
+- Bybit: manual analysis, scanner, and historical backtest
+- Binance: manual analysis only
+- Manual cards remain visible when a setup is not recommended or an API call fails
+- Backtests use closed-candle signals, delayed entry-zone fills, SL-first same-candle ordering, and non-overlapping positions by default
+- Default round-trip cost: `0.11%` fee plus `0.20%` slippage
+- OOS summary: the last `20%` of each mode-specific candle series is reported separately
+
+## Local Preview
+
+Run a static server from this directory:
+
+```powershell
+npx.cmd serve .
+```
+
+Then open the URL printed by the server.
+
+## GitHub Pages
+
+Publish the static files from the repository root on the `main` branch. In GitHub repository settings, select `Pages`, choose deployment from a branch, and select `/ (root)`.
+
+## Security
+
+- No credentials are stored or transmitted.
+- Persistence is opt-in and allowlisted.
+- API-origin text is rendered through DOM text nodes.
+- External market-cap data can fail or throttle; the UI falls back to Bybit-only profile data.
+
+## Known Temporary Limits
+
+- Daily and swing split-entry/split-TP values are advisory and not yet included in backtest PnL.
+- CoinGecko symbol-to-ID mapping needs a dedicated mapping layer.
+- Final browser verification must be repeated after GitHub Pages deployment.
+
+This dashboard is an analysis tool, not financial advice.

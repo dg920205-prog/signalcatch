@@ -4,6 +4,24 @@ function toNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+export function calculateTurnoverSharePct(symbol, tickers = []) {
+  let total = 0;
+  let selected = 0;
+
+  for (const ticker of tickers) {
+    const turnover = Number(ticker?.turnover24h);
+    if (!Number.isFinite(turnover) || turnover < 0) {
+      continue;
+    }
+    total += turnover;
+    if (ticker?.symbol === symbol) {
+      selected = turnover;
+    }
+  }
+
+  return total > 0 ? (selected / total) * 100 : null;
+}
+
 function normalizeWeights(turnover24h, marketCapSharePct, bybitSharePct) {
   let profileScore = 0;
 

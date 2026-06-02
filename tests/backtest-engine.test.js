@@ -246,6 +246,7 @@ test("runBacktest passes only historical candles into signal analysis", () => {
     classify,
     makePlan,
     symbol: "BTCUSDT",
+    allowOverlapping: true,
   });
 
   assert.deepEqual(seenTimes, [0, 1, 2, 3]);
@@ -274,6 +275,7 @@ test("changing future candles cannot change earlier signal analysis input", () =
     analyze,
     classify: () => ({ common: { eligible: true } }),
     makePlan: () => bullPlan,
+    allowOverlapping: true,
   };
 
   runBacktest({ ...dependencies, candles: original });
@@ -304,6 +306,24 @@ test("runBacktest checks the selected mode and combines fees with slippage", () 
 
   assert.equal(results.length, 1);
   assert.equal(results[0].pnlPct, 5.69);
+});
+
+test("runBacktest suppresses overlapping signals by default", () => {
+  const results = runBacktest({
+    candles: Array.from({ length: 5 }, (_, index) =>
+      candle({ open: 102, high: 103, low: 101, close: 102, time: index }),
+    ),
+    mode: "common",
+    waitCandles: 2,
+    feePct: 0,
+    slippagePct: 0,
+    analyze: () => ({ direction: "bull" }),
+    classify: () => ({ common: { eligible: true } }),
+    makePlan: () => bullPlan,
+  });
+
+  assert.equal(results.length, 2);
+  assert.deepEqual(results.map(({ signalIndex }) => signalIndex), [0, 3]);
 });
 
 test("runBacktest rejects malformed options", () => {

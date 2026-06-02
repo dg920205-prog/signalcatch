@@ -14,16 +14,24 @@ This phase prioritizes delivery with safe fallbacks. The items below capture kno
 
 ## Follow-Up Review Backlog
 
-1. Replace temporary market-share proxy (`100 / rank`) with direct market dominance metrics.
-2. Add explicit OOS split execution in engine (`in-sample` vs `out-of-sample` trade buckets).
-3. Add robust retry/backoff and cache window for CoinGecko calls.
-4. Add scanner-to-backtest pipeline so selected scanner candidates can be tested in one click.
-5. Add UI-level mode selector for recommendation card (current mode is tab-driven).
-6. Add visual equity curve from computed trades instead of placeholder polyline.
-7. Add regression tests for backtest run-card content and CSV export button wiring.
+1. Add split-fill simulation for `daily` and `swing`; current split guidance is advisory.
+2. Add robust CoinGecko ID mapping, retry/backoff, and cache window.
+3. Add scanner-to-backtest pipeline so selected scanner candidates can be tested in one click.
+4. Add UI-level mode selector for recommendation card (current mode is tab-driven).
+5. Add visual equity curve from computed trades instead of placeholder polyline.
+6. Add browser-level regression coverage for CSV download wiring.
+
+## Completed Hardening
+
+1. Use direct Bybit `turnover24h` share instead of a rank proxy.
+2. Fetch historical candles with each mode's configured timeframe.
+3. Exclude Binance-only manual assets from Bybit backtests.
+4. Calculate separate OOS buckets and display OOS win rate and return.
+5. Suppress overlapping signals by default.
+6. Make quick-period buttons update both start and end dates.
 
 ## Risk Notes
 
 1. Free external APIs can throttle or block requests; fallback messaging must remain visible.
 2. Daily/swing split guidance is advisory only and not auto-order execution.
-3. Backtest confidence can be overstated without strict OOS bucket reporting; this is queued above.
+3. Split guidance is not included in backtest PnL until split-fill simulation is added.
