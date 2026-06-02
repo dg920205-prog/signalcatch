@@ -41,6 +41,9 @@ h2 { margin-bottom: .25rem; }
 .tabs button { border-color: transparent; background: transparent; white-space: nowrap; }
 .tabs .is-active { border-color: var(--cyan); color: var(--cyan); background: #103457; }
 .panel { padding: 1rem; }
+.usage-guide { margin: 1rem 0; border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem; background: var(--navy-900); }
+.usage-guide summary, .scanner-setups summary { color: var(--cyan); cursor: pointer; font-weight: 800; }
+.usage-guide ol { margin-bottom: 0; padding-left: 1.25rem; color: var(--slate); }
 .section-heading { justify-content: space-between; }
 .section-heading label { min-width: 180px; }
 .inline-form { margin-bottom: 1rem; }
@@ -52,6 +55,10 @@ h2 { margin-bottom: .25rem; }
 .mode-row { display: flex; gap: .3rem; flex-wrap: wrap; }
 .diagnostics { color: var(--slate); font-size: .8rem; }
 .progress-row { margin: 1rem 0; }
+.toolbar input { width: 110px; }
+.scanner-setups { margin-top: .4rem; }
+.setup-table { margin-top: .4rem; font-size: .8rem; }
+.split-note { display: grid; gap: .2rem; min-width: 250px; white-space: normal; }
 progress { width: min(540px, 100%); accent-color: var(--cyan); }
 .table-wrap { max-width: 100%; overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; }

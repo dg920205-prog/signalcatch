@@ -30,6 +30,9 @@ This phase prioritizes delivery with safe fallbacks. The items below capture kno
 10. Let users select the recommendation-card mode independently from the active tab.
 11. Draw the equity curve from compounded closed-trade returns.
 12. Cover CSV blob creation, anchor click, filename, and URL cleanup with an automated regression test.
+13. Replace the temporary seven-symbol scanner with a Bybit turnover-ranked top-N universe and seven-symbol API fallback.
+14. Display expandable current-price setups for every scanner timeframe, including entry zone, SL, TP, and available split guidance.
+15. Add an in-page usage guide that positions backtesting as an optional secondary check.
 
 ## Risk Notes
 

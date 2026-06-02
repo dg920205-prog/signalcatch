@@ -1,5 +1,5 @@
 import { fetchBinanceCandles, fetchBinanceTicker } from "./api/binance.js";
-import { fetchBybitCandles, fetchBybitHistory, fetchBybitTicker } from "./api/bybit.js";
+import { fetchBybitCandles, fetchBybitHistory, fetchBybitTicker, fetchBybitTopSymbols } from "./api/bybit.js";
 import { createMarketProfileLoader } from "./analysis/market-profile.js";
 import { buildRecommendation } from "./analysis/recommendation.js";
 import { runBacktest } from "./backtest/engine.js";
@@ -35,6 +35,7 @@ const elements = {
   tradeResults: document.querySelector("#trade-results"),
   exportCsv: document.querySelector("#export-csv"),
   scannerRun: document.querySelector("#scanner-run"),
+  scannerLimit: document.querySelector("#scanner-limit"),
   scannerProgress: document.querySelector("#scanner-progress"),
   scannerResults: document.querySelector("#scanner-results"),
 };
@@ -55,8 +56,11 @@ const adapters = {
 const manualService = createManualAssetService(adapters);
 const scannerService = createScannerService({
   bybit: {
+    fetchTicker: fetchBybitTicker,
     fetchCandles: (symbol, { signal } = {}) =>
       fetchBybitCandles(symbol, { interval: MODE_CONFIG.common.interval, limit: 250, signal }),
+    fetchModeCandles: (symbol, mode, { signal } = {}) =>
+      fetchBybitCandles(symbol, { interval: MODE_CONFIG[mode].interval, limit: 250, signal }),
   },
 });
 let lastTrades = [];
@@ -224,11 +228,16 @@ async function runBacktestFlow() {
 async function runScannerFlow() {
   setApiStatus(elements.apiStatus, "loading", { dom });
   renderScannerProgress(elements.scannerProgress, { completed: 0, total: 0 }, { dom });
+  let usedFallback = false;
   try {
-    const symbols = manualService.list().map((asset) => asset.symbol);
-    const universe = symbols.length
-      ? symbols
-      : ["BTC", "ETH", "SOL", "XRP", "HBAR", "ADA", "DOGE"];
+    const limit = Number(elements.scannerLimit.value);
+    let universe;
+    try {
+      universe = await fetchBybitTopSymbols({ limit });
+    } catch {
+      usedFallback = true;
+      universe = ["BTC", "ETH", "SOL", "XRP", "HBAR", "ADA", "DOGE"];
+    }
     const candidates = await scannerService.run({
       symbols: universe,
       onProgress: ({ completed, total }) =>
@@ -239,7 +248,7 @@ async function runScannerFlow() {
       dom,
       onBacktest: runScannerCandidateBacktest,
     });
-    setApiStatus(elements.apiStatus, "ready", { dom });
+    setApiStatus(elements.apiStatus, usedFallback ? "error" : "ready", { dom });
     rerender();
   } catch {
     setApiStatus(elements.apiStatus, "error", { dom });

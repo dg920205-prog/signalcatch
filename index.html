@@ -22,6 +22,16 @@
     </header>
     <main class="dashboard-shell">
       <section id="summary-grid" class="summary-grid" aria-label="Dashboard summary"></section>
+      <details class="usage-guide">
+        <summary>How to use SignalCatch</summary>
+        <ol>
+          <li>Open Scanner and scan the top Bybit USDT perpetuals. The default is 100 symbols and you can change it from 10 to 200.</li>
+          <li>Expand Current setups for a symbol. Review every timeframe before making a decision.</li>
+          <li>Entry zone, SL, and TP are current-price analysis values. Daily and swing setups also show split entries and split TP guidance.</li>
+          <li>Use Backtest as an optional secondary check. Historical win rate is not a promise about the next trade.</li>
+          <li>SignalCatch is an analysis dashboard. It does not place orders and is not financial advice.</li>
+        </ol>
+      </details>
       <nav class="tabs" role="tablist" aria-label="Dashboard views">
         <button id="manual-tab" type="button" role="tab" aria-controls="manual-panel" aria-selected="true" data-tab="manual">Manual assets</button>
         <button id="scanner-tab" type="button" role="tab" aria-controls="scanner-panel" aria-selected="false" data-tab="scanner">Scanner</button>
@@ -39,7 +49,7 @@
       </section>
       <section id="scanner-panel" class="panel" role="tabpanel" aria-labelledby="scanner-tab" data-panel="scanner" hidden>
         <div class="section-heading"><div><p class="eyebrow">BYBIT FIRST</p><h2>Market scanner</h2></div></div>
-        <div class="toolbar"><label>Universe<select id="scanner-universe"><option>Bybit USDT perpetuals</option></select></label><button id="scanner-run" type="button">Run scanner</button></div>
+        <div class="toolbar"><label>Universe<select id="scanner-universe"><option>Bybit USDT perpetuals</option></select></label><label for="scanner-limit">Top symbols</label><input id="scanner-limit" name="scannerLimit" type="number" value="100" min="10" max="200"><button id="scanner-run" type="button">Run scanner</button></div>
         <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress><span>0 / 0</span></div>
         <div id="scanner-results" class="table-wrap"><p class="empty-state">Scanner results will appear here.</p></div>
       </section>

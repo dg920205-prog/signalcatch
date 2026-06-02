@@ -8,6 +8,7 @@ import {
 import {
   fetchBybitCandles,
   fetchBybitHistory,
+  fetchBybitTopSymbols,
   fetchBybitTicker,
   normalizeBybitKlines,
   searchBybitSymbols,
@@ -365,6 +366,113 @@ test("finds a valid Bybit symbol", async () => {
       assert.deepEqual(await searchBybitSymbols("btc"), ["BTCUSDT"]);
     },
   );
+});
+
+test("fetchBybitTopSymbols returns ranked trading USDT perpetuals", async () => {
+  await withFetchStub(
+    async (url) => {
+      const path = new URL(url).pathname;
+      return new Response(
+        JSON.stringify(
+          path.endsWith("/instruments-info")
+            ? {
+                retCode: 0,
+                result: {
+                  list: [
+                    { symbol: "BTCUSDT", contractType: "LinearPerpetual", status: "Trading", quoteCoin: "USDT" },
+                    { symbol: "ETHUSDT", contractType: "LinearPerpetual", status: "Trading", quoteCoin: "USDT" },
+                    { symbol: "SOLUSDT", contractType: "LinearPerpetual", status: "Trading", quoteCoin: "USDT" },
+                    { symbol: "BADUSDT", contractType: "LinearPerpetual", status: "Settled", quoteCoin: "USDT" },
+                    { symbol: "BTCUSD", contractType: "InversePerpetual", status: "Trading", quoteCoin: "USD" },
+                  ],
+                },
+              }
+            : {
+                retCode: 0,
+                result: {
+                  list: [
+                    { symbol: "BTCUSDT", turnover24h: "100" },
+                    { symbol: "ETHUSDT", turnover24h: "300" },
+                    { symbol: "SOLUSDT", turnover24h: "not-a-number" },
+                    { symbol: "BADUSDT", turnover24h: "999" },
+                  ],
+                },
+              },
+        ),
+      );
+    },
+    async () => {
+      assert.deepEqual(await fetchBybitTopSymbols({ limit: 10 }), ["ETH", "BTC"]);
+    },
+  );
+});
+
+test("fetchBybitTopSymbols follows instrument cursors before ranking", async () => {
+  const requestedUrls = [];
+  await withFetchStub(
+    async (url) => {
+      const requestUrl = new URL(url);
+      requestedUrls.push(requestUrl);
+      if (requestUrl.pathname.endsWith("/instruments-info")) {
+        return new Response(
+          JSON.stringify({
+            retCode: 0,
+            result: requestUrl.searchParams.get("cursor") === "next-page"
+              ? {
+                  list: [
+                    { symbol: "ETHUSDT", contractType: "LinearPerpetual", status: "Trading", quoteCoin: "USDT" },
+                  ],
+                  nextPageCursor: "",
+                }
+              : {
+                  list: [
+                    { symbol: "BTCUSDT", contractType: "LinearPerpetual", status: "Trading", quoteCoin: "USDT" },
+                  ],
+                  nextPageCursor: "next-page",
+                },
+          }),
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          retCode: 0,
+          result: {
+            list: [
+              { symbol: "BTCUSDT", turnover24h: "100" },
+              { symbol: "ETHUSDT", turnover24h: "300" },
+            ],
+          },
+        }),
+      );
+    },
+    async () => {
+      assert.deepEqual(await fetchBybitTopSymbols({ limit: 10 }), ["ETH", "BTC"]);
+    },
+  );
+
+  const instrumentRequests = requestedUrls.filter((url) =>
+    url.pathname.endsWith("/instruments-info"),
+  );
+  assert.equal(instrumentRequests.length, 2);
+  assert.equal(instrumentRequests[0].searchParams.get("limit"), "1000");
+  assert.equal(instrumentRequests[1].searchParams.get("cursor"), "next-page");
+});
+
+test("fetchBybitTopSymbols rejects unsafe limits before fetching", async () => {
+  let fetchCalled = false;
+  await withFetchStub(
+    async () => {
+      fetchCalled = true;
+      throw new Error("fetch should not run");
+    },
+    async () => {
+      for (const limit of [9, 201, 10.5, "100"]) {
+        await assert.rejects(fetchBybitTopSymbols({ limit }), { kind: "input" });
+      }
+    },
+  );
+  assert.equal(fetchCalled, false);
 });
 
 test("fetches valid Bybit candles", async () => {

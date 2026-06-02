@@ -5,6 +5,7 @@ import { fetchJson } from "./http.js";
 
 const EXCHANGE = "Bybit";
 const MAX_HISTORY_PAGES = 1000;
+const MAX_UNIVERSE_PAGES = 10;
 const DECIMAL_NUMBER = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
 const VALID_INTERVALS = new Set([
   "1",
@@ -194,6 +195,71 @@ export async function searchBybitSymbols(input) {
   }
 
   return symbols;
+}
+
+export async function fetchBybitTopSymbols({ limit = 100 } = {}) {
+  if (!Number.isInteger(limit) || limit < 10 || limit > 200) {
+    throw inputError("scanner universe");
+  }
+
+  const instruments = [];
+  const seenCursors = new Set();
+  let cursor;
+  for (let page = 0; page < MAX_UNIVERSE_PAGES; page += 1) {
+    const payload = await fetchJson(
+      createUrl("/v5/market/instruments-info", { category: "linear", limit: 1000, cursor }),
+      {
+        exchange: EXCHANGE,
+        operation: "scanner universe",
+      },
+    );
+    instruments.push(...requireBybitList(payload, "scanner universe"));
+    const nextCursor = payload.result?.nextPageCursor;
+    if (!nextCursor) break;
+    if (typeof nextCursor !== "string" || seenCursors.has(nextCursor)) {
+      throw formatError("scanner universe");
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+    if (page === MAX_UNIVERSE_PAGES - 1) {
+      throw formatError("scanner universe");
+    }
+  }
+  const tickers = requireBybitList(
+    await fetchJson(createUrl("/v5/market/tickers", { category: "linear" }), {
+      exchange: EXCHANGE,
+      operation: "scanner universe",
+    }),
+    "scanner universe",
+  );
+  const allowed = new Set(
+    instruments
+      .filter(
+        (item) =>
+          item?.contractType === "LinearPerpetual" &&
+          item?.status === "Trading" &&
+          item?.quoteCoin === "USDT" &&
+          typeof item?.symbol === "string" &&
+          item.symbol.endsWith("USDT"),
+      )
+      .map((item) => item.symbol),
+  );
+
+  return tickers
+    .flatMap((ticker) => {
+      try {
+        const symbol = ticker?.symbol;
+        const turnover24h = toFiniteNumber(ticker?.turnover24h, "scanner universe");
+        return allowed.has(symbol) && turnover24h >= 0
+          ? [{ symbol, turnover24h }]
+          : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort((left, right) => right.turnover24h - left.turnover24h)
+    .slice(0, limit)
+    .map(({ symbol }) => symbol.slice(0, -"USDT".length));
 }
 
 export async function fetchBybitCandles(

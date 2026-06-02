@@ -328,6 +328,56 @@ test("scanner results expose a one-click backtest action for each candidate", ()
   assert.deepEqual(selected, ["HBAR"]);
 });
 
+test("scanner results render expandable current setups for every timeframe", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const plan = {
+    direction: "bull",
+    entryLow: 98,
+    entryHigh: 100,
+    sl: 96,
+    tp: 106,
+  };
+  const setups = Object.fromEntries(
+    ["common", "scalp", "day", "daily", "swing"].map((mode) => [
+      mode,
+      {
+        mode,
+        direction: "bull",
+        plan,
+        recommendation: {
+          label: "추천",
+          split: mode === "daily"
+            ? {
+                entries: [{ label: "E1", price: 100, weightPct: 25 }],
+                targets: [{ label: "TP1", price: 104, weightPct: 40 }],
+              }
+            : null,
+        },
+      },
+    ]),
+  );
+
+  renderScannerResults(
+    container,
+    [{ symbol: "HBAR", exchange: "Bybit", status: "ready", price: 0.18, modeResults: {}, setups }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.equal(text.includes("현재가"), true);
+  assert.equal(text.includes("0.18"), true);
+  assert.equal(text.includes("진입 구간"), true);
+  assert.equal(text.includes("98 ~ 100"), true);
+  assert.equal(text.includes("SL"), true);
+  assert.equal(text.includes("96"), true);
+  assert.equal(text.includes("TP"), true);
+  assert.equal(text.includes("106"), true);
+  assert.equal(text.includes("daily"), true);
+  assert.equal(text.includes("분할 진입 E1 100 (25%)"), true);
+  assert.equal(text.includes("분할 TP TP1 104 (40%)"), true);
+});
+
 test("metric renderer uses safe fallbacks for hostile getters", () => {
   const dom = createDom(createFakeDocument());
   const container = new FakeNode("section");
@@ -569,6 +619,11 @@ test("index exposes tab, progress, and backtest form accessibility contracts", a
     assert.match(html, new RegExp(`id="${tab}-panel"[^>]*role="tabpanel"[^>]*aria-labelledby="${tab}-tab"`));
   }
   assert.match(html, /<progress id="scanner-progress"[^>]*role="progressbar"[^>]*aria-label="Scanner progress"/);
+  assert.match(html, /<label for="scanner-limit">Top symbols<\/label>/);
+  assert.match(html, /<input id="scanner-limit" name="scannerLimit" type="number" value="100" min="10" max="200"/);
+  assert.match(html, /<details class="usage-guide"/);
+  assert.match(html, /How to use SignalCatch/);
+  assert.match(html, /Entry zone, SL, and TP/);
   assert.match(html, /<label for="backtest-days">Preset days<\/label>/);
   assert.match(html, /<label for="backtest-symbols">Symbols<\/label>/);
   assert.match(html, /<input id="backtest-symbols"/);

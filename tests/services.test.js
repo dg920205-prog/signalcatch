@@ -428,6 +428,34 @@ test("scanner caps concurrency, normalizes duplicates, limits symbols, and repor
   );
 });
 
+test("scanner builds current position setups for every timeframe", async () => {
+  const requestedModes = [];
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "HBARUSDT", price: 0.18 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async (symbol, mode) => {
+        requestedModes.push([symbol, mode]);
+        return trendingCandles(100, 2);
+      },
+    },
+  });
+
+  const [candidate] = await service.run({ symbols: ["HBAR"] });
+
+  assert.equal(candidate.price, 0.18);
+  assert.deepEqual(requestedModes, MODES.map((mode) => ["HBAR", mode]));
+  assert.deepEqual(Object.keys(candidate.setups), MODES);
+  for (const mode of MODES) {
+    assert.equal(candidate.setups[mode].mode, mode);
+    assert.equal(candidate.setups[mode].direction, "bull");
+    assert.ok(candidate.setups[mode].plan);
+    assert.equal(typeof candidate.setups[mode].recommendation.label, "string");
+  }
+  assert.ok(candidate.setups.daily.recommendation.split);
+  assert.ok(candidate.setups.swing.recommendation.split);
+});
+
 test("scanner rejects unsafe concurrency fanout", () => {
   assert.throws(
     () =>

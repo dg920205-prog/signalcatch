@@ -4,13 +4,15 @@ SignalCatch is a free static crypto-signal dashboard for GitHub Pages. It uses p
 
 ## Feature Boundary
 
-- Bybit: manual analysis, scanner, and historical backtest
+- Bybit: current-position scanner, manual analysis, and historical backtest
 - Binance: manual analysis only
 - Manual cards remain visible when a setup is not recommended or an API call fails
 - Backtests use closed-candle signals, delayed entry-zone fills, SL-first same-candle ordering, and non-overlapping positions by default
 - Default round-trip cost: `0.11%` fee plus `0.20%` slippage
 - OOS summary: the last `20%` of each mode-specific candle series is reported separately
 - Daily and swing backtests simulate three split entries and three split targets with the default split profile
+- Scanner default: top `100` Bybit USDT perpetuals by 24-hour turnover, editable from `10` to `200`
+- Scanner setup details: current price plus every timeframe's direction, entry zone, SL, TP, recommendation, and available split guidance
 
 ## Local Preview
 

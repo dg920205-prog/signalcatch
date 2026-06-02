@@ -10,6 +10,82 @@ function safeRead(value, key, fallback) {
   }
 }
 
+function toPrice(value) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")
+    : "-";
+}
+
+function renderSplit(split, dom) {
+  const entries = snapshotArray(safeRead(split, "entries", []), 3).values;
+  const targets = snapshotArray(safeRead(split, "targets", []), 3).values;
+  if (!entries.length || !targets.length) return null;
+  return dom.el(
+    "div",
+    { class: "split-note" },
+    dom.el(
+      "span",
+      {},
+      `분할 진입 ${entries.map((entry) =>
+        `${safeText(safeRead(entry, "label"), "-")} ${toPrice(safeRead(entry, "price"))} (${safeText(safeRead(entry, "weightPct"), "-")}%)`,
+      ).join(", ")}`,
+    ),
+    dom.el(
+      "span",
+      {},
+      `분할 TP ${targets.map((target) =>
+        `${safeText(safeRead(target, "label"), "-")} ${toPrice(safeRead(target, "price"))} (${safeText(safeRead(target, "weightPct"), "-")}%)`,
+      ).join(", ")}`,
+    ),
+  );
+}
+
+function renderSetupDetails(candidate, dom) {
+  const setups = safeRead(candidate, "setups", {});
+  const body = dom.el("tbody");
+  for (const mode of MODES) {
+    const setup = safeRead(setups, mode, {});
+    const plan = safeRead(setup, "plan", null);
+    const recommendation = safeRead(setup, "recommendation", {});
+    dom.append(
+      body,
+      dom.el(
+        "tr",
+        {},
+        dom.el("td", {}, mode),
+        dom.el("td", {}, safeText(safeRead(setup, "direction"), "neutral")),
+        dom.el("td", {}, plan ? `${toPrice(safeRead(plan, "entryLow"))} ~ ${toPrice(safeRead(plan, "entryHigh"))}` : "-"),
+        dom.el("td", {}, plan ? toPrice(safeRead(plan, "sl")) : "-"),
+        dom.el("td", {}, plan ? toPrice(safeRead(plan, "tp")) : "-"),
+        dom.el("td", {}, safeText(safeRead(recommendation, "label"), "비추천")),
+        dom.el("td", {}, renderSplit(safeRead(recommendation, "split", null), dom)),
+      ),
+    );
+  }
+  return dom.el(
+    "details",
+    { class: "scanner-setups" },
+    dom.el("summary", {}, "현재 셋업 보기"),
+    dom.el("p", { class: "muted" }, `현재가 ${toPrice(safeRead(candidate, "price"))}`),
+    dom.el(
+      "table",
+      { class: "data-table setup-table" },
+      dom.el(
+        "thead",
+        {},
+        dom.el(
+          "tr",
+          {},
+          ...["모드", "방향", "진입 구간", "SL", "TP", "추천", "분할 안내"].map((label) =>
+            dom.el("th", {}, label),
+          ),
+        ),
+      ),
+      body,
+    ),
+  );
+}
+
 export function renderScannerResults(container, candidates = [], { dom, onBacktest } = {}) {
   dom.clear(container);
   const body = dom.el("tbody");
@@ -18,7 +94,7 @@ export function renderScannerResults(container, candidates = [], { dom, onBackte
     const modeResults = safeRead(candidate, "modeResults", {});
     const symbol = safeText(safeRead(candidate, "symbol"), "Unknown");
     dom.append(body, dom.el("tr", {},
-      dom.el("td", {}, symbol),
+      dom.el("td", {}, symbol, renderSetupDetails(candidate, dom)),
       dom.el("td", {}, safeText(safeRead(candidate, "exchange"), "Bybit")),
       dom.el("td", {}, safeText(safeRead(candidate, "status"), "idle")),
       ...MODES.map((mode) => dom.el("td", {}, safeRead(safeRead(modeResults, mode, {}), "eligible", false) ? "Signal" : "-")),

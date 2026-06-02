@@ -1,5 +1,8 @@
 import { analyzeCandles, classifyModes } from "../analysis/signals.js";
+import { buildRecommendation } from "../analysis/recommendation.js";
 import { normalizeBaseSymbol } from "../core/symbols.js";
+
+const MODES = ["common", "scalp", "day", "daily", "swing"];
 
 function clone(value) {
   return structuredClone(value);
@@ -154,19 +157,46 @@ export function createScannerService({
             const symbol = normalizedSymbols[index];
 
             try {
-              const candles = await Promise.resolve().then(() =>
-                bybit.fetchCandles(symbol, { signal }),
-              );
+              const sharedCandles = bybit.fetchModeCandles
+                ? null
+                : await Promise.resolve().then(() =>
+                    bybit.fetchCandles(symbol, { signal }),
+                  );
+              const ticker = bybit.fetchTicker
+                ? await Promise.resolve().then(() => bybit.fetchTicker(symbol))
+                : null;
+              const setups = {};
+              for (const mode of MODES) {
+                const candles = sharedCandles ?? await Promise.resolve().then(() =>
+                  bybit.fetchModeCandles(symbol, mode, { signal }),
+                );
+                const modeAnalysis = analyze(candles);
+                const modeResults = signalClassify(modeAnalysis);
+                const recommendation = buildRecommendation({
+                  analysis: modeAnalysis,
+                  modeResults,
+                  mode,
+                });
+                setups[mode] = {
+                  mode,
+                  direction: modeAnalysis.direction,
+                  analysis: modeAnalysis,
+                  plan: recommendation.plan,
+                  recommendation,
+                };
+              }
               throwIfAborted(signal);
-              const analysis = analyze(candles);
+              const analysis = setups.common.analysis;
               candidates[index] = {
                 symbol,
                 exchange: "Bybit",
                 status: "ready",
                 error: null,
                 diagnostics: [],
+                price: ticker?.price ?? analysis.close ?? null,
                 analysis,
                 modeResults: signalClassify(analysis),
+                setups,
               };
             } catch (error) {
               if (
