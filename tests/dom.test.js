@@ -289,6 +289,26 @@ test("manual HBAR card stays visible and renders API-origin text as text nodes",
   assert.equal(container.childNodes[0].tagName, "article");
 });
 
+test("manual card formats ticker prices with at most four decimals", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+
+  renderManualAssetCard(
+    container,
+    {
+      symbol: "JTO",
+      exchange: "Bybit",
+      ticker: { price: 0.629234 },
+      modeResults: {},
+    },
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.match(text, /0\.6292/);
+  assert.doesNotMatch(text, /0\.629234/);
+});
+
 test("renderers isolate hostile external rows and preserve safe content", () => {
   const dom = createDom(createFakeDocument());
   const hostile = new Proxy({}, { get() { throw new Error("blocked"); } });

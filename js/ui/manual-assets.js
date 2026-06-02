@@ -22,6 +22,7 @@ function renderDiagnostic(diagnostic = {}, dom) {
 export function renderManualAssetCard(container, asset = {}, { dom }) {
   const status = safeText(safeRead(asset, "status"), "idle");
   const ticker = safeRead(asset, "ticker", {});
+  const tickerPrice = safeRead(ticker, "price", null);
   const modeResults = safeRead(asset, "modeResults", {});
   const diagnostics = safeRead(asset, "diagnostics", []);
   const error = safeRead(asset, "error", "");
@@ -45,7 +46,7 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
       ),
       dom.el("span", { class: "status-label" }, status),
     ),
-    dom.el("p", { class: "price" }, safeText(safeRead(ticker, "price"), "Price pending")),
+    dom.el("p", { class: "price" }, typeof tickerPrice === "number" ? formatPrice(tickerPrice) : safeText(tickerPrice, "Price pending")),
     dom.el("p", { class: "quality-line" }, `진입 품질: ${quality}`),
     dom.el(
       "div",
