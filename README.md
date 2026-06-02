@@ -14,10 +14,10 @@ SignalCatch is a free static crypto-signal dashboard for GitHub Pages. It uses p
 
 ## Local Preview
 
-Run a static server from this directory:
+Run the dependency-free static preview server from this directory:
 
 ```powershell
-npx.cmd serve .
+npm.cmd run preview
 ```
 
 Then open the URL printed by the server.
@@ -37,6 +37,6 @@ Publish the static files from the repository root on the `main` branch. In GitHu
 
 - Daily and swing backtests use the default split profile; per-symbol profile weights are not yet injected into historical runs.
 - Common CoinGecko IDs are mapped. Unknown symbols use a lowercase fallback and may remain on Bybit-only profile data.
-- Final browser verification must be repeated after GitHub Pages deployment.
+- Final CSV download-event verification must be repeated after GitHub Pages deployment.
 
 This dashboard is an analysis tool, not financial advice.

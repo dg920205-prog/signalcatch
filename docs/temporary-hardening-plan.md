@@ -14,7 +14,7 @@ This phase prioritizes delivery with safe fallbacks. The items below capture kno
 
 ## Follow-Up Review Backlog
 
-1. Add browser-level regression coverage for CSV download wiring.
+1. Repeat CSV download-event verification after public deployment; the in-app browser does not expose download events.
 
 ## Completed Hardening
 
@@ -29,6 +29,7 @@ This phase prioritizes delivery with safe fallbacks. The items below capture kno
 9. Run a scanner candidate backtest from its result row with one click.
 10. Let users select the recommendation-card mode independently from the active tab.
 11. Draw the equity curve from compounded closed-trade returns.
+12. Cover CSV blob creation, anchor click, filename, and URL cleanup with an automated regression test.
 
 ## Risk Notes
 

@@ -8,7 +8,7 @@ import { buildModeJobs, partitionOosTrades, presetDateWindow, selectBybitSymbols
 import { MODE_CONFIG } from "./config.js";
 import { createManualAssetService } from "./services/manual-assets.js";
 import { createScannerService } from "./services/scanner.js";
-import { buildBacktestRequest, exportBacktestCsv, renderBacktestMetrics, renderEquityCurve, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
+import { buildBacktestRequest, downloadBacktestCsv, renderBacktestMetrics, renderEquityCurve, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
 import { dom } from "./ui/dom.js";
 import { renderManualAssets } from "./ui/manual-assets.js";
@@ -296,14 +296,7 @@ function bindBacktestForm() {
     await runBacktestFlow();
   });
   elements.exportCsv.addEventListener("click", () => {
-    const csv = exportBacktestCsv(lastTrades);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `signalcatch-backtest-${Date.now()}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadBacktestCsv(lastTrades);
   });
 }
 

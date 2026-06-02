@@ -329,3 +329,29 @@ export const renderBacktestResults = renderTrades;
 export function exportBacktestCsv(trades = []) {
   return tradesToCsv(trades);
 }
+
+export function downloadBacktestCsv(
+  trades = [],
+  {
+    BlobCtor = globalThis.Blob,
+    createAnchor = () => document.createElement("a"),
+    createObjectURL = (blob) => URL.createObjectURL(blob),
+    revokeObjectURL = (url) => URL.revokeObjectURL(url),
+    now = Date.now,
+  } = {},
+) {
+  const blob = new BlobCtor([exportBacktestCsv(trades)], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = createObjectURL(blob);
+  const anchor = createAnchor();
+  const filename = `signalcatch-backtest-${now()}.csv`;
+  anchor.href = url;
+  anchor.download = filename;
+  try {
+    anchor.click();
+  } finally {
+    revokeObjectURL(url);
+  }
+  return filename;
+}

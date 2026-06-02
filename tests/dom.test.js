@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   buildBacktestRequest,
+  downloadBacktestCsv,
   renderExecutionCard,
   renderBacktestMetrics,
   renderBacktestResults,
@@ -356,6 +357,35 @@ test("equity renderer draws a computed polyline and shows an empty state without
 
   renderEquityCurve(container, [], { dom });
   assert.equal(flattenText(container).includes("Run a backtest"), true);
+});
+
+test("downloadBacktestCsv creates a CSV blob, clicks its anchor, and revokes its URL", () => {
+  const anchor = { clicked: false, click() { this.clicked = true; } };
+  const blobs = [];
+  const revoked = [];
+
+  const filename = downloadBacktestCsv(
+    [{ symbol: "HBAR", status: "closed", outcome: "win", pnlPct: 1 }],
+    {
+      BlobCtor: class {
+        constructor(parts, options) {
+          blobs.push({ parts, options });
+        }
+      },
+      createAnchor: () => anchor,
+      createObjectURL: () => "blob:signalcatch-test",
+      revokeObjectURL: (url) => revoked.push(url),
+      now: () => 123,
+    },
+  );
+
+  assert.equal(filename, "signalcatch-backtest-123.csv");
+  assert.equal(anchor.href, "blob:signalcatch-test");
+  assert.equal(anchor.download, filename);
+  assert.equal(anchor.clicked, true);
+  assert.deepEqual(revoked, ["blob:signalcatch-test"]);
+  assert.equal(blobs[0].options.type, "text/csv;charset=utf-8");
+  assert.equal(blobs[0].parts[0].includes("'HBAR"), true);
 });
 
 test("execution card renders separate OOS metrics", () => {
