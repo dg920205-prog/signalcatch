@@ -1,6 +1,7 @@
 import { fetchBinanceCandles, fetchBinanceTicker } from "./api/binance.js";
 import { fetchBybitCandles, fetchBybitHistory, fetchBybitTicker } from "./api/bybit.js";
-import { buildRecommendation, calculateTurnoverSharePct } from "./analysis/recommendation.js";
+import { createMarketProfileLoader } from "./analysis/market-profile.js";
+import { buildRecommendation } from "./analysis/recommendation.js";
 import { runBacktest } from "./backtest/engine.js";
 import { groupSummaries, summarizeTrades } from "./backtest/metrics.js";
 import { buildModeJobs, partitionOosTrades, presetDateWindow, selectBybitSymbols } from "./backtest/workflow.js";
@@ -43,6 +44,7 @@ const elements = {
 };
 
 const marketProfileById = new Map();
+const marketProfileLoader = createMarketProfileLoader();
 const adapters = {
   bybit: {
     fetchTicker: fetchBybitTicker,
@@ -80,44 +82,6 @@ function updateSummary(assets = [], tradeCount = 0) {
   );
 }
 
-async function fetchMarketProfile(symbol) {
-  const profile = {
-    source: "fallback",
-    turnover24h: null,
-    marketCapSharePct: null,
-    bybitSharePct: null,
-  };
-  try {
-    const turnover = await fetch(
-      "https://api.bybit.com/v5/market/tickers?category=linear",
-    ).then((res) => res.json());
-    const tickers = turnover?.result?.list ?? [];
-    const ticker = tickers.find((item) => item?.symbol === `${symbol}USDT`);
-    const turnover24h = Number(ticker?.turnover24h);
-    if (Number.isFinite(turnover24h) && turnover24h >= 0) {
-      profile.turnover24h = turnover24h;
-    }
-    profile.bybitSharePct = calculateTurnoverSharePct(`${symbol}USDT`, tickers);
-  } catch {}
-  try {
-    const [coin, global] = await Promise.all([
-      fetch(
-        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(symbol.toLowerCase())}`,
-      ).then((res) => res.json()),
-      fetch("https://api.coingecko.com/api/v3/global").then((res) => res.json()),
-    ]);
-    const marketCap = Number(coin?.[0]?.market_cap);
-    const totalCap = Number(global?.data?.total_market_cap?.usd);
-    if (Number.isFinite(marketCap) && Number.isFinite(totalCap) && totalCap > 0) {
-      profile.marketCapSharePct = (marketCap / totalCap) * 100;
-    }
-    if (profile.marketCapSharePct !== null) {
-      profile.source = "full";
-    }
-  } catch {}
-  return profile;
-}
-
 function enrichAssets(rawAssets) {
   const activeTab =
     document
@@ -152,7 +116,7 @@ async function addManualAsset(form) {
   setApiStatus(elements.apiStatus, "loading", { dom });
   try {
     const asset = await manualService.add({ symbol, exchange });
-    marketProfileById.set(asset.id, await fetchMarketProfile(asset.symbol));
+    marketProfileById.set(asset.id, await marketProfileLoader.load(asset.symbol));
     setApiStatus(elements.apiStatus, "ready", { dom });
     rerender();
   } catch {

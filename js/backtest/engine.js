@@ -1,5 +1,5 @@
 import { analyzeCandles, classifyModes } from "../analysis/signals.js";
-import { buildTradePlan } from "../analysis/trade-plan.js";
+import { buildSplitTargets, buildTradePlan } from "../analysis/trade-plan.js";
 
 const SUPPORTED_MODES = new Set(["common", "scalp", "day", "daily", "swing"]);
 
@@ -90,6 +90,144 @@ function closeTrade(plan, entryPrice, exitPrice, holdCandles, costPct) {
     exitPrice,
     pnlPct,
     holdCandles,
+  };
+}
+
+function touchesPrice(candle, price) {
+  return candle.low <= price && candle.high >= price;
+}
+
+function hitsTarget(direction, candle, price) {
+  return direction === "bull" ? candle.high >= price : candle.low <= price;
+}
+
+function weightedAverage(legs) {
+  const totalWeight = legs.reduce((total, leg) => total + leg.weightPct, 0);
+  return legs.reduce((total, leg) => total + leg.price * leg.weightPct, 0) / totalWeight;
+}
+
+function validSplitLegs(legs) {
+  return (
+    Array.isArray(legs) &&
+    legs.length === 3 &&
+    legs.every(
+      ({ price, weightPct }) =>
+        isPositiveNumber(price) && isPositiveNumber(weightPct),
+    ) &&
+    Math.abs(legs.reduce((total, { weightPct }) => total + weightPct, 0) - 100) <
+      0.000001
+  );
+}
+
+function directionPnlPct(direction, entryPrice, exitPrice) {
+  return direction === "bull"
+    ? ((exitPrice - entryPrice) / entryPrice) * 100
+    : ((entryPrice - exitPrice) / entryPrice) * 100;
+}
+
+export function simulateSplitPlannedTrade({
+  plan,
+  split,
+  futureCandles,
+  waitCandles,
+  costPct,
+} = {}) {
+  validateSimulationInput({ plan, futureCandles, waitCandles, costPct });
+
+  if (
+    !split ||
+    !validSplitLegs(split.entries) ||
+    !validSplitLegs(split.targets)
+  ) {
+    throw new TypeError("Invalid split planned trade simulation input");
+  }
+
+  const entries = split.entries.map((entry) => ({ ...entry, filled: false }));
+  const targets = split.targets.map((target) => ({ ...target, filled: false }));
+
+  for (let index = 0; index < Math.min(waitCandles, futureCandles.length); index += 1) {
+    const candle = futureCandles[index];
+    for (const entry of entries) {
+      if (!entry.filled && touchesPrice(candle, entry.price)) {
+        entry.filled = true;
+      }
+    }
+    const filledEntries = entries.filter(({ filled }) => filled);
+    const hitsStop =
+      plan.direction === "bull" ? candle.low <= plan.sl : candle.high >= plan.sl;
+    if (filledEntries.length > 0 && hitsStop) {
+      const entryPrice = weightedAverage(filledEntries);
+      return {
+        status: "closed",
+        outcome: "loss",
+        entryPrice,
+        exitPrice: plan.sl,
+        pnlPct: directionPnlPct(plan.direction, entryPrice, plan.sl) - costPct,
+        holdCandles: index,
+        filledEntryLegs: filledEntries.length,
+        filledTargetLegs: 0,
+      };
+    }
+  }
+
+  const filledEntries = entries.filter(({ filled }) => filled);
+  if (filledEntries.length === 0) {
+    return { status: "unfilled" };
+  }
+
+  const entryPrice = weightedAverage(filledEntries);
+  let realizedPnlPct = 0;
+  let remainingWeight = 100;
+
+  for (let index = waitCandles; index < futureCandles.length; index += 1) {
+    const candle = futureCandles[index];
+    const hitsStop =
+      plan.direction === "bull" ? candle.low <= plan.sl : candle.high >= plan.sl;
+    if (hitsStop) {
+      realizedPnlPct +=
+        directionPnlPct(plan.direction, entryPrice, plan.sl) * (remainingWeight / 100);
+      const pnlPct = realizedPnlPct - costPct;
+      return {
+        status: "closed",
+        outcome: pnlPct >= 0 ? "win" : "loss",
+        entryPrice,
+        exitPrice: plan.sl,
+        pnlPct,
+        holdCandles: index,
+        filledEntryLegs: filledEntries.length,
+        filledTargetLegs: targets.filter(({ filled }) => filled).length,
+      };
+    }
+
+    for (const target of targets) {
+      if (!target.filled && hitsTarget(plan.direction, candle, target.price)) {
+        target.filled = true;
+        remainingWeight -= target.weightPct;
+        realizedPnlPct +=
+          directionPnlPct(plan.direction, entryPrice, target.price) *
+          (target.weightPct / 100);
+      }
+    }
+    if (remainingWeight <= 0.000001) {
+      return {
+        status: "closed",
+        outcome: "win",
+        entryPrice,
+        exitPrice: targets.at(-1).price,
+        pnlPct: realizedPnlPct - costPct,
+        holdCandles: index,
+        filledEntryLegs: filledEntries.length,
+        filledTargetLegs: targets.length,
+      };
+    }
+  }
+
+  return {
+    status: "open",
+    entryPrice,
+    holdCandles: Math.max(0, futureCandles.length - waitCandles),
+    filledEntryLegs: filledEntries.length,
+    filledTargetLegs: targets.filter(({ filled }) => filled).length,
   };
 }
 
@@ -210,12 +348,21 @@ export function runBacktest({
       continue;
     }
 
-    const simulated = simulatePlannedTrade({
-      plan,
-      futureCandles: candles.slice(index + 1),
-      waitCandles,
-      costPct,
-    });
+    const split = buildSplitTargets(plan, mode);
+    const simulated = split
+      ? simulateSplitPlannedTrade({
+          plan,
+          split,
+          futureCandles: candles.slice(index + 1),
+          waitCandles,
+          costPct,
+        })
+      : simulatePlannedTrade({
+          plan,
+          futureCandles: candles.slice(index + 1),
+          waitCandles,
+          costPct,
+        });
 
     results.push({
       symbol,

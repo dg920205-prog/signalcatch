@@ -84,7 +84,7 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
       dom.el(
         "details",
         { class: "diagnostics" },
-        dom.el("summary", {}, "분할 진입/익절 참고안 (백테스트 미반영)"),
+        dom.el("summary", {}, "분할 진입/익절 (데일리·스윙 백테스트 반영)"),
         dom.el(
           "p",
           {},

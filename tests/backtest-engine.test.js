@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   runBacktest,
   simulatePlannedTrade,
+  simulateSplitPlannedTrade,
 } from "../js/backtest/engine.js";
+import { buildSplitTargets } from "../js/analysis/trade-plan.js";
 
 const bullPlan = {
   direction: "bull",
@@ -324,6 +326,107 @@ test("runBacktest suppresses overlapping signals by default", () => {
 
   assert.equal(results.length, 2);
   assert.deepEqual(results.map(({ signalIndex }) => signalIndex), [0, 3]);
+});
+
+test("simulateSplitPlannedTrade applies weighted entries and partial targets", () => {
+  const split = buildSplitTargets(bullPlan, "daily");
+  const result = simulateSplitPlannedTrade({
+    plan: bullPlan,
+    split,
+    futureCandles: [
+      candle({ open: 100, high: 100.5, low: 97.9, close: 99 }),
+      candle({ open: 100, high: 103.3, low: 99, close: 103 }),
+      candle({ open: 104, high: 104.9, low: 103, close: 104 }),
+      candle({ open: 106, high: 107.3, low: 105, close: 107 }),
+    ],
+    waitCandles: 1,
+    costPct: 0,
+  });
+
+  assert.equal(result.status, "closed");
+  assert.equal(result.outcome, "win");
+  assert.equal(result.filledEntryLegs, 3);
+  assert.equal(result.filledTargetLegs, 3);
+  assert.equal(Number(result.entryPrice.toFixed(2)), 98.85);
+  assert.equal(Number(result.pnlPct.toFixed(2)), 5.98);
+});
+
+test("simulateSplitPlannedTrade prioritizes stop loss over same-candle targets", () => {
+  const split = buildSplitTargets(bullPlan, "swing");
+  const result = simulateSplitPlannedTrade({
+    plan: bullPlan,
+    split,
+    futureCandles: [
+      candle({ open: 100, high: 108, low: 95, close: 100 }),
+    ],
+    waitCandles: 1,
+    costPct: 0.31,
+  });
+
+  assert.equal(result.status, "closed");
+  assert.equal(result.outcome, "loss");
+  assert.equal(result.exitPrice, 96);
+  assert.equal(result.filledTargetLegs, 0);
+});
+
+test("simulateSplitPlannedTrade labels a partial-target stop by its net pnl", () => {
+  const split = buildSplitTargets(bullPlan, "daily");
+  const result = simulateSplitPlannedTrade({
+    plan: bullPlan,
+    split,
+    futureCandles: [
+      candle({ open: 100, high: 100.5, low: 97.9, close: 99 }),
+      candle({ open: 102, high: 103.3, low: 99, close: 103 }),
+      candle({ open: 99, high: 100, low: 95, close: 96 }),
+    ],
+    waitCandles: 1,
+    costPct: 0,
+  });
+
+  assert.equal(result.status, "closed");
+  assert.equal(result.filledTargetLegs, 1);
+  assert.equal(result.outcome, "win");
+  assert.ok(result.pnlPct > 0);
+});
+
+test("simulateSplitPlannedTrade rejects malformed split legs", () => {
+  const valid = {
+    plan: bullPlan,
+    split: buildSplitTargets(bullPlan, "daily"),
+    futureCandles: [candle()],
+    waitCandles: 1,
+    costPct: 0,
+  };
+
+  for (const split of [
+    null,
+    { entries: [], targets: [] },
+    { ...valid.split, entries: [{ price: Number.NaN, weightPct: 100 }, ...valid.split.entries.slice(1)] },
+    { ...valid.split, targets: valid.split.targets.map((target) => ({ ...target, weightPct: 0 })) },
+  ]) {
+    assert.throws(() => simulateSplitPlannedTrade({ ...valid, split }), TypeError);
+  }
+});
+
+test("runBacktest uses split simulation for daily and swing modes", () => {
+  const results = runBacktest({
+    candles: [
+      candle({ open: 101, high: 102, low: 101, close: 101 }),
+      candle({ open: 100, high: 100.5, low: 97.9, close: 99, time: 1 }),
+      candle({ open: 106, high: 107.3, low: 105, close: 107, time: 2 }),
+    ],
+    mode: "daily",
+    waitCandles: 1,
+    feePct: 0,
+    slippagePct: 0,
+    analyze: () => ({ direction: "bull" }),
+    classify: () => ({ daily: { eligible: true } }),
+    makePlan: () => bullPlan,
+  });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].filledEntryLegs, 3);
+  assert.equal(results[0].filledTargetLegs, 3);
 });
 
 test("runBacktest rejects malformed options", () => {

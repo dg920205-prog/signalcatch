@@ -10,6 +10,7 @@ SignalCatch is a free static crypto-signal dashboard for GitHub Pages. It uses p
 - Backtests use closed-candle signals, delayed entry-zone fills, SL-first same-candle ordering, and non-overlapping positions by default
 - Default round-trip cost: `0.11%` fee plus `0.20%` slippage
 - OOS summary: the last `20%` of each mode-specific candle series is reported separately
+- Daily and swing backtests simulate three split entries and three split targets with the default split profile
 
 ## Local Preview
 
@@ -34,8 +35,8 @@ Publish the static files from the repository root on the `main` branch. In GitHu
 
 ## Known Temporary Limits
 
-- Daily and swing split-entry/split-TP values are advisory and not yet included in backtest PnL.
-- CoinGecko symbol-to-ID mapping needs a dedicated mapping layer.
+- Daily and swing backtests use the default split profile; per-symbol profile weights are not yet injected into historical runs.
+- Common CoinGecko IDs are mapped. Unknown symbols use a lowercase fallback and may remain on Bybit-only profile data.
 - Final browser verification must be repeated after GitHub Pages deployment.
 
 This dashboard is an analysis tool, not financial advice.

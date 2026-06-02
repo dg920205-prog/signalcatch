@@ -24,7 +24,7 @@ Review of the static GitHub Pages dashboard, public exchange adapters, persisten
 
 ## Residual Risks
 
-1. Split-entry and split-TP guidance is advisory until split-fill simulation is added.
+1. Daily and swing split-fill simulation uses the default split profile; per-symbol profile weights are not yet injected into historical runs.
 2. Free public APIs can throttle, fail CORS checks, or change response shape.
-3. CoinGecko ID mapping is incomplete for symbols whose API IDs differ from ticker symbols.
+3. Common CoinGecko IDs are mapped. Unknown symbols use a lowercase fallback and may remain on Bybit-only profile data.
 4. Browser-level verification is still required after public deployment.
