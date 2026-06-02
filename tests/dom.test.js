@@ -15,7 +15,7 @@ import { activateTab, bindTabs, renderSummary } from "../js/ui/dashboard.js";
 import { createDom, snapshotArray } from "../js/ui/dom.js";
 import { formatPrice } from "../js/ui/format.js";
 import { renderManualAssetCard, renderManualAssets } from "../js/ui/manual-assets.js";
-import { renderMarketDetail, renderMarketHeatmap } from "../js/ui/market.js";
+import { renderMarketChart, renderMarketDetail, renderMarketHeatmap } from "../js/ui/market.js";
 import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
 
@@ -69,6 +69,11 @@ function createFakeDocument() {
   return {
     createElement(tagName) {
       return new FakeNode(tagName);
+    },
+    createElementNS(namespaceURI, tagName) {
+      const node = new FakeNode(tagName);
+      node.namespaceURI = namespaceURI;
+      return node;
     },
     createTextNode(value) {
       const node = new FakeNode();
@@ -497,6 +502,28 @@ test("market detail renders timeframe controls chart briefing and strongest setu
   const [oneHour] = findNodes(container, (node) => node.tagName === "button" && flattenText(node) === "1H");
   oneHour.listeners.click();
   assert.deepEqual(selected, ["1H"]);
+});
+
+test("market chart creates real SVG namespace elements", () => {
+  const documentRef = createFakeDocument();
+  documentRef.createElementNS = (namespaceURI, tagName) => {
+    const node = new FakeNode(tagName);
+    node.namespaceURI = namespaceURI;
+    return node;
+  };
+  const dom = createDom(documentRef);
+  const container = new FakeNode("section");
+
+  renderMarketChart(container, {
+    prices: [{ time: 1, value: 100 }, { time: 2, value: 102 }],
+    shortAverage: [null, 101],
+    longAverage: [null, 100.5],
+  }, null, { dom });
+
+  const [svg] = findNodes(container, (node) => node.tagName === "svg");
+  const [polyline] = findNodes(container, (node) => node.tagName === "polyline");
+  assert.equal(svg.namespaceURI, "http://www.w3.org/2000/svg");
+  assert.equal(polyline.namespaceURI, "http://www.w3.org/2000/svg");
 });
 
 test("metric renderer uses safe fallbacks for hostile getters", () => {

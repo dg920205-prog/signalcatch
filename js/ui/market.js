@@ -78,10 +78,10 @@ export function renderMarketChart(container, chart = {}, _setup, { dom }) {
     dom.append(container, dom.el("p", { class: "empty-state" }, "Chart data is unavailable."));
     return;
   }
-  dom.append(container, dom.el("svg", { viewBox: "0 0 100 100", "aria-label": "Market price chart" },
-    dom.el("polyline", { class: "chart-price", points: points(prices) }),
-    dom.el("polyline", { class: "chart-short-average", points: points(chart.shortAverage ?? []) }),
-    dom.el("polyline", { class: "chart-long-average", points: points(chart.longAverage ?? []) }),
+  dom.append(container, dom.svgEl("svg", { viewBox: "0 0 100 100", "aria-label": "Market price chart" },
+    dom.svgEl("polyline", { class: "chart-price", points: points(prices) }),
+    dom.svgEl("polyline", { class: "chart-short-average", points: points(chart.shortAverage ?? []) }),
+    dom.svgEl("polyline", { class: "chart-long-average", points: points(chart.longAverage ?? []) }),
   ));
 }
 

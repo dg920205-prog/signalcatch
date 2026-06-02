@@ -84,9 +84,7 @@ export function createDom(documentRef = globalThis.document) {
     return node;
   }
 
-  function el(tagName, attributes = {}, ...children) {
-    const node = documentRef.createElement(tagName);
-
+  function applyAttributes(node, attributes) {
     for (const [name, value] of Object.entries(attributes ?? {})) {
       if (/^on[A-Z]/.test(name) && typeof value === "function") {
         node.addEventListener(name.slice(2).toLowerCase(), value);
@@ -94,11 +92,24 @@ export function createDom(documentRef = globalThis.document) {
         node.setAttribute(name, value === true ? "" : String(value));
       }
     }
-
-    return append(node, ...children);
+    return node;
   }
 
-  return { append, clear, el, setText };
+  function el(tagName, attributes = {}, ...children) {
+    return append(applyAttributes(documentRef.createElement(tagName), attributes), ...children);
+  }
+
+  function svgEl(tagName, attributes = {}, ...children) {
+    if (!documentRef.createElementNS) {
+      throw new TypeError("SVG document implementation is required.");
+    }
+    return append(
+      applyAttributes(documentRef.createElementNS("http://www.w3.org/2000/svg", tagName), attributes),
+      ...children,
+    );
+  }
+
+  return { append, clear, el, setText, svgEl };
 }
 
 export const dom = globalThis.document ? createDom(globalThis.document) : null;
