@@ -8,7 +8,7 @@ import { buildModeJobs, partitionOosTrades, presetDateWindow, selectBybitSymbols
 import { MODE_CONFIG } from "./config.js";
 import { createManualAssetService } from "./services/manual-assets.js";
 import { createScannerService } from "./services/scanner.js";
-import { buildBacktestRequest, exportBacktestCsv, renderBacktestMetrics, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
+import { buildBacktestRequest, exportBacktestCsv, renderBacktestMetrics, renderEquityCurve, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
 import { dom } from "./ui/dom.js";
 import { renderManualAssets } from "./ui/manual-assets.js";
@@ -29,6 +29,7 @@ const elements = {
   backtestForm: document.querySelector("#backtest-form"),
   backtestRunCard: document.querySelector("#backtest-run-card"),
   backtestMetrics: document.querySelector("#backtest-metrics"),
+  equityChart: document.querySelector("#equity-chart"),
   symbolSummary: document.querySelector("#symbol-summary"),
   modeSummary: document.querySelector("#mode-summary"),
   tradeResults: document.querySelector("#trade-results"),
@@ -191,6 +192,7 @@ async function runBacktestFlow() {
     lastTrades = trades;
     const summary = summarizeTrades(trades);
     renderBacktestMetrics(elements.backtestMetrics, summary, { dom });
+    renderEquityCurve(elements.equityChart, trades, { dom });
     renderGroupedBySymbol(elements.symbolSummary, groupSummaries(trades, "symbol"), { dom });
     renderGroupedByMode(elements.modeSummary, groupSummaries(trades, "mode"), { dom });
     renderTrades(elements.tradeResults, trades, { dom });

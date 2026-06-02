@@ -30,6 +30,25 @@ function multiplyFinite(value, factor) {
   return Number.isFinite(next) ? next : Number.MAX_VALUE;
 }
 
+export function buildEquitySeries(trades = []) {
+  const series = [100];
+  let equity = 100;
+
+  for (const trade of trades) {
+    try {
+      if (trade?.status !== "closed" || !isValidPnlPct(trade.pnlPct)) {
+        continue;
+      }
+      equity = multiplyFinite(equity, 1 + trade.pnlPct / 100);
+      series.push(roundMetric(equity));
+    } catch {
+      // Skip malformed external rows without interrupting chart rendering.
+    }
+  }
+
+  return series;
+}
+
 export function summarizeTrades(trades = []) {
   const closedTrades = trades.filter((trade) => trade?.status === "closed");
   const pnlValues = closedTrades

@@ -7,6 +7,7 @@ import {
   renderExecutionCard,
   renderBacktestMetrics,
   renderBacktestResults,
+  renderEquityCurve,
   renderTrades,
 } from "../js/ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary } from "../js/ui/dashboard.js";
@@ -333,6 +334,28 @@ test("metric renderer uses safe fallbacks for hostile getters", () => {
 
   assert.doesNotThrow(() => renderBacktestMetrics(container, metrics, { dom }));
   assert.equal(flattenText(container).includes("Closed trades"), true);
+});
+
+test("equity renderer draws a computed polyline and shows an empty state without closed trades", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+
+  renderEquityCurve(
+    container,
+    [
+      { status: "closed", pnlPct: 4 },
+      { status: "closed", pnlPct: -2 },
+    ],
+    { dom },
+  );
+
+  const [polyline] = findNodes(container, (node) => node.tagName === "polyline");
+  assert.ok(polyline);
+  assert.match(polyline.getAttribute("points"), /^12,/);
+  assert.equal(flattenText(container).includes("Run a backtest"), false);
+
+  renderEquityCurve(container, [], { dom });
+  assert.equal(flattenText(container).includes("Run a backtest"), true);
 });
 
 test("execution card renders separate OOS metrics", () => {

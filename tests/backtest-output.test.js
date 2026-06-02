@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { tradesToCsv } from "../js/backtest/csv.js";
-import { groupSummaries, summarizeTrades } from "../js/backtest/metrics.js";
+import { buildEquitySeries, groupSummaries, summarizeTrades } from "../js/backtest/metrics.js";
 
 const trades = [
   {
@@ -45,6 +45,18 @@ test("summarizeTrades calculates portfolio metrics from closed trades", () => {
     averageHoldCandles: 2.5,
     maxConsecutiveLosses: 1,
   });
+});
+
+test("buildEquitySeries compounds only valid closed trades", () => {
+  assert.deepEqual(buildEquitySeries(trades), [100, 104, 101.92]);
+  assert.deepEqual(
+    buildEquitySeries([
+      { status: "open", pnlPct: 50 },
+      { status: "closed", pnlPct: Number.NaN },
+      { status: "closed", pnlPct: 5 },
+    ]),
+    [100, 105],
+  );
 });
 
 test("groupSummaries calculates metrics by symbol and mode", () => {

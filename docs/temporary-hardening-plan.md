@@ -14,8 +14,7 @@ This phase prioritizes delivery with safe fallbacks. The items below capture kno
 
 ## Follow-Up Review Backlog
 
-1. Add visual equity curve from computed trades instead of placeholder polyline.
-2. Add browser-level regression coverage for CSV download wiring.
+1. Add browser-level regression coverage for CSV download wiring.
 
 ## Completed Hardening
 
@@ -29,6 +28,7 @@ This phase prioritizes delivery with safe fallbacks. The items below capture kno
 8. Map common CoinGecko IDs and apply a retry and cache window to market-profile requests.
 9. Run a scanner candidate backtest from its result row with one click.
 10. Let users select the recommendation-card mode independently from the active tab.
+11. Draw the equity curve from compounded closed-trade returns.
 
 ## Risk Notes
 

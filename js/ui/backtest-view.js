@@ -1,4 +1,5 @@
 import { tradesToCsv } from "../backtest/csv.js";
+import { buildEquitySeries } from "../backtest/metrics.js";
 import { BACKTEST_DEFAULTS, MODE_CONFIG } from "../config.js";
 import { normalizeBaseSymbol } from "../core/symbols.js";
 import { safeText, snapshotArray } from "./dom.js";
@@ -202,6 +203,43 @@ export function renderBacktestMetrics(container, metrics = {}, { dom }) {
         dom.el("span", { class: "muted" }, label),
         dom.el("strong", {}, value),
       ),
+    ),
+  );
+}
+
+export function renderEquityCurve(container, trades = [], { dom }) {
+  dom.clear(container);
+  const series = buildEquitySeries(snapshotArray(trades).values);
+  if (series.length <= 1) {
+    dom.append(
+      container,
+      dom.el("p", { class: "empty-state" }, "Run a backtest to calculate the equity curve."),
+    );
+    return;
+  }
+
+  const width = 800;
+  const height = 180;
+  const padding = 12;
+  const minimum = Math.min(...series);
+  const maximum = Math.max(...series);
+  const range = maximum - minimum;
+  const points = series
+    .map((equity, index) => {
+      const x = padding + (index / (series.length - 1)) * (width - padding * 2);
+      const y = range === 0
+        ? height / 2
+        : height - padding - ((equity - minimum) / range) * (height - padding * 2);
+      return `${Number(x.toFixed(2))},${Number(y.toFixed(2))}`;
+    })
+    .join(" ");
+
+  dom.append(
+    container,
+    dom.el(
+      "svg",
+      { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Computed equity curve" },
+      dom.el("polyline", { points }),
     ),
   );
 }

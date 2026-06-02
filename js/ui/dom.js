@@ -1,7 +1,7 @@
 const SAFE_ATTRIBUTES = new Set([
   "id", "title", "type", "value", "name", "placeholder", "role", "class",
   "for", "min", "max", "step", "open", "hidden", "datetime", "disabled",
-  "checked", "selected", "download",
+  "checked", "selected", "download", "viewBox", "points",
 ]);
 
 function isSafeAttribute(name) {
