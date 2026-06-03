@@ -481,6 +481,32 @@ test("market heatmap renders theme scores and selectable asset tiles", () => {
   assert.deepEqual(selected, ["BTC"]);
 });
 
+test("market heatmap shows top five tiles and collapses remaining assets", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderMarketHeatmap(
+    container,
+    {
+      L1: {
+        theme: "L1",
+        score: 12,
+        label: "Neutral",
+        tiles: ["A", "B", "C", "D", "E", "F"].map((symbol, index) => ({
+          symbol,
+          score: 50 - index,
+          label: "Strong",
+          status: "ready",
+        })),
+      },
+    },
+    { dom },
+  );
+
+  const visibleGrid = findNodes(container, (node) => node.attributes.class === "heatmap-grid")[0];
+  assert.equal(findNodes(visibleGrid, (node) => node.attributes.class?.includes("heatmap-tile")).length, 5);
+  assert.equal(flattenText(container).includes("전체 종목 보기"), true);
+});
+
 test("market detail renders timeframe controls chart briefing and strongest setup", () => {
   const dom = createDom(createFakeDocument());
   const container = new FakeNode("section");

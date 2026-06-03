@@ -8,6 +8,7 @@ import {
   calculateSymbolStrength,
   calculateThemeStrength,
   calculateVolumeChange,
+  rankThemeTiles,
   selectStrongestSetup,
 } from "../js/analysis/market-heatmap.js";
 import { createMarketService } from "../js/services/market.js";
@@ -54,6 +55,17 @@ test("theme strength uses turnover weighting so low-volume outliers do not domin
 
   assert.equal(result.score > 0, true);
   assert.equal(result.label, "Strong");
+});
+
+test("theme tiles rank by seventy percent strength and thirty percent liquidity", () => {
+  const tiles = rankThemeTiles([
+    { symbol: "FAST", status: "ready", score: 80, turnover24h: 10 },
+    { symbol: "LIQUID", status: "ready", score: 55, turnover24h: 1000 },
+    { symbol: "MID", status: "ready", score: 60, turnover24h: 500 },
+  ]);
+
+  assert.equal(tiles[0].symbol, "LIQUID");
+  assert.equal(typeof tiles[0].discoveryScore, "number");
 });
 
 test("strongest setup prefers higher recommendation confidence", () => {

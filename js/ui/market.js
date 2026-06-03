@@ -24,7 +24,23 @@ export function renderMarketHeatmap(container, themes = {}, { dom, onSelect } = 
     dom.append(container, dom.el("p", { class: "empty-state" }, "Refresh the market heatmap to begin."));
     return;
   }
+  const renderTile = (tile) =>
+    dom.el(
+      "button",
+      {
+        type: "button",
+        class: `heatmap-tile ${strengthClass(safeRead(tile, "label", "Neutral"))}`,
+        disabled: safeRead(tile, "status", "unavailable") !== "ready",
+        onClick: () => onSelect?.(safeRead(tile, "symbol", "")),
+      },
+      dom.el("strong", {}, safeText(safeRead(tile, "symbol"), "Unknown")),
+      dom.el("span", {}, safeText(safeRead(tile, "label"), "Neutral")),
+      dom.el("span", {}, scoreText(safeRead(tile, "score"))),
+    );
   for (const [name, theme] of entries) {
+    const tiles = Array.isArray(theme?.tiles) ? theme.tiles : [];
+    const visibleTiles = tiles.slice(0, 5);
+    const hiddenTiles = tiles.slice(5);
     dom.append(
       container,
       dom.el(
@@ -36,21 +52,14 @@ export function renderMarketHeatmap(container, themes = {}, { dom, onSelect } = 
             `${safeText(safeRead(theme, "label"), "Neutral")} ${scoreText(safeRead(theme, "score"))}`),
         ),
         dom.el("div", { class: "heatmap-grid" },
-          (Array.isArray(theme?.tiles) ? theme.tiles : []).map((tile) =>
-            dom.el(
-              "button",
-              {
-                type: "button",
-                class: `heatmap-tile ${strengthClass(safeRead(tile, "label", "Neutral"))}`,
-                disabled: safeRead(tile, "status", "unavailable") !== "ready",
-                onClick: () => onSelect?.(safeRead(tile, "symbol", "")),
-              },
-              dom.el("strong", {}, safeText(safeRead(tile, "symbol"), "Unknown")),
-              dom.el("span", {}, safeText(safeRead(tile, "label"), "Neutral")),
-              dom.el("span", {}, scoreText(safeRead(tile, "score"))),
-            ),
-          ),
+          visibleTiles.map(renderTile),
         ),
+        hiddenTiles.length
+          ? dom.el("details", { class: "heatmap-more" },
+              dom.el("summary", {}, "전체 종목 보기"),
+              dom.el("div", { class: "heatmap-grid" }, hiddenTiles.map(renderTile)),
+            )
+          : null,
       ),
     );
   }

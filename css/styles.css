@@ -71,6 +71,9 @@ h2 { margin-bottom: .25rem; }
 .heatmap-theme { margin-top: 1rem; }
 .heatmap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: .5rem; }
 .heatmap-tile { display: grid; gap: .15rem; text-align: left; }
+.heatmap-more { margin-top: .55rem; color: var(--slate); }
+.heatmap-more summary { color: var(--cyan); cursor: pointer; font-weight: 800; }
+.heatmap-more .heatmap-grid { margin-top: .5rem; }
 .strength-badge { border-radius: 999px; padding: .15rem .5rem; font-size: .75rem; }
 .strength-strong { border-color: var(--green); color: var(--green); }
 .strength-neutral { border-color: var(--yellow); color: var(--yellow); }

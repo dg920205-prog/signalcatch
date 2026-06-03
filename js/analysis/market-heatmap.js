@@ -60,6 +60,25 @@ export function calculateThemeStrength(symbols = []) {
   return { score, label: strengthLabel(score) };
 }
 
+export function rankThemeTiles(tiles = []) {
+  const items = Array.isArray(tiles) ? tiles : [];
+  const ready = items.filter((tile) => tile?.status === "ready");
+  const byTurnover = [...ready].sort((left, right) =>
+    finiteOrZero(right?.turnover24h) - finiteOrZero(left?.turnover24h));
+  const liquidityBySymbol = new Map(byTurnover.map((tile, index) => [
+    tile.symbol,
+    byTurnover.length === 1 ? 100 : 100 - (index / (byTurnover.length - 1)) * 100,
+  ]));
+
+  return items
+    .map((tile) => ({
+      ...tile,
+      discoveryScore: finiteOrZero(tile?.score) * 0.7 +
+        finiteOrZero(liquidityBySymbol.get(tile?.symbol)) * 0.3,
+    }))
+    .sort((left, right) => finiteOrZero(right.discoveryScore) - finiteOrZero(left.discoveryScore));
+}
+
 export function selectStrongestSetup(setups = {}) {
   const weights = { "비추천": 0, "주의": 1, "추천": 2 };
   return Object.values(setups).reduce((best, setup) => {

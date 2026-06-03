@@ -4,6 +4,7 @@ import {
   calculateSymbolStrength,
   calculateThemeStrength,
   calculateVolumeChange,
+  rankThemeTiles,
   selectStrongestSetup,
   THEMES,
 } from "../analysis/market-heatmap.js";
@@ -84,7 +85,7 @@ export function createMarketService({ bybit, themes = THEMES, concurrency = 4 } 
 
     return {
       themes: Object.fromEntries(Object.entries(themes).map(([theme, symbols]) => {
-        const tiles = symbols.map((symbol) => tileBySymbol.get(symbol));
+        const tiles = rankThemeTiles(symbols.map((symbol) => tileBySymbol.get(symbol)));
         return [theme, { theme, tiles, ...calculateThemeStrength(tiles) }];
       })),
     };
