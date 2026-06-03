@@ -1,5 +1,5 @@
 import { fetchBinanceCandles, fetchBinanceTicker } from "./api/binance.js";
-import { fetchBybitCandles, fetchBybitHistory, fetchBybitMarketTickers, fetchBybitTicker, fetchBybitTopSymbols } from "./api/bybit.js";
+import { fetchBybitCandles, fetchBybitHistory, fetchBybitMarketTickers, fetchBybitTicker, fetchBybitTopSymbols, searchBybitSymbols } from "./api/bybit.js";
 import { createMarketProfileLoader } from "./analysis/market-profile.js";
 import { buildRecommendation } from "./analysis/recommendation.js";
 import { runBacktest } from "./backtest/engine.js";
@@ -9,6 +9,7 @@ import { MODE_CONFIG } from "./config.js";
 import { createManualAssetService } from "./services/manual-assets.js";
 import { createMarketService } from "./services/market.js";
 import { createScannerService } from "./services/scanner.js";
+import { createScannerSearchService } from "./services/scanner-search.js";
 import { buildBacktestRequest, downloadBacktestCsv, renderBacktestMetrics, renderEquityCurve, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
 import { dom } from "./ui/dom.js";
@@ -39,6 +40,8 @@ const elements = {
   tradeResults: document.querySelector("#trade-results"),
   exportCsv: document.querySelector("#export-csv"),
   scannerRun: document.querySelector("#scanner-run"),
+  scannerSearchForm: document.querySelector("#scanner-search-form"),
+  scannerSearchStatus: document.querySelector("#scanner-search-status"),
   scannerLimit: document.querySelector("#scanner-limit"),
   scannerProgress: document.querySelector("#scanner-progress"),
   scannerResults: document.querySelector("#scanner-results"),
@@ -79,6 +82,11 @@ const marketService = createMarketService({
 let lastTrades = [];
 let lastScannerCandidates = [];
 let selectedMarketSymbol = null;
+const scannerSearchService = createScannerSearchService({
+  searchSymbols: searchBybitSymbols,
+  scanSymbols: (symbols) => scannerService.run({ symbols }),
+  getCandidates: () => lastScannerCandidates,
+});
 
 function nowIso() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -258,10 +266,7 @@ async function runScannerFlow() {
         renderScannerProgress(elements.scannerProgress, { completed, total }, { dom }),
     });
     lastScannerCandidates = candidates;
-    renderScannerResults(elements.scannerResults, candidates, {
-      dom,
-      onBacktest: runScannerCandidateBacktest,
-    });
+    renderScannerResults(elements.scannerResults, candidates, { dom });
     setApiStatus(elements.apiStatus, usedFallback ? "error" : "ready", { dom });
     rerender();
   } catch {
@@ -269,19 +274,36 @@ async function runScannerFlow() {
   }
 }
 
-async function runScannerCandidateBacktest(symbol) {
-  elements.backtestSymbols.value = symbol;
-  if (
-    !elements.backtestForm.elements.startDate.value ||
-    !elements.backtestForm.elements.endDate.value
-  ) {
-    const { startDate, endDate } = presetDateWindow(Number(elements.backtestDays.value));
-    elements.backtestForm.elements.startDate.value = startDate;
-    elements.backtestForm.elements.endDate.value = endDate;
+async function runScannerSearch(form) {
+  const symbol = String(new FormData(form).get("symbol") ?? "");
+  dom.setText(elements.scannerSearchStatus, "종목을 확인하고 있습니다.");
+  try {
+    const result = await scannerSearchService.search(symbol);
+    if (result.kind === "unsupported") {
+      dom.setText(elements.scannerSearchStatus, `${result.symbol}: Bybit 미지원 종목`);
+      return;
+    }
+    if (result.kind === "analysis-error") {
+      dom.setText(elements.scannerSearchStatus, `${result.symbol}: 분석 결과를 불러오지 못했습니다.`);
+      return;
+    }
+    if (result.kind === "added") {
+      lastScannerCandidates = [
+        ...lastScannerCandidates.filter((candidate) => candidate.symbol !== result.symbol),
+        result.candidate,
+      ];
+    }
+    renderScannerResults(elements.scannerResults, [result.candidate], { dom });
+    dom.setText(
+      elements.scannerSearchStatus,
+      result.kind === "existing"
+        ? `${result.symbol}: 기존 스캔 결과를 표시합니다.`
+        : `${result.symbol}: 즉시 분석 결과를 추가했습니다.`,
+    );
+    rerender();
+  } catch {
+    dom.setText(elements.scannerSearchStatus, "종목 검색 중 API 오류가 발생했습니다.");
   }
-  activateTab("backtest");
-  elements.backtestSymbols.focus();
-  await runBacktestFlow();
 }
 
 function bindDialog() {
@@ -331,6 +353,10 @@ function bindBacktestForm() {
 function bindScanner() {
   elements.scannerRun.addEventListener("click", async () => {
     await runScannerFlow();
+  });
+  elements.scannerSearchForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await runScannerSearch(elements.scannerSearchForm);
   });
 }
 

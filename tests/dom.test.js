@@ -792,6 +792,9 @@ test("index exposes primary market navigation and hidden advanced backtest contr
   assert.match(html, /id="market-heatmap"/);
   assert.match(html, /id="market-detail"/);
   assert.match(html, /<progress id="scanner-progress"[^>]*role="progressbar"[^>]*aria-label="Scanner progress"/);
+  assert.match(html, /id="scanner-search-form"/);
+  assert.match(html, /id="scanner-search-symbol"[^>]*name="symbol"[^>]*required/);
+  assert.match(html, /id="scanner-search-status"[^>]*role="status"/);
   assert.match(html, /<label for="scanner-limit">Top symbols<\/label>/);
   assert.match(html, /<input id="scanner-limit" name="scannerLimit" type="number" value="100" min="10" max="200"/);
   assert.match(html, /<details class="usage-guide"/);

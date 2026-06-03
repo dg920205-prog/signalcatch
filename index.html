@@ -48,6 +48,11 @@
       </section>
       <section id="scanner-panel" class="panel" role="tabpanel" aria-labelledby="scanner-tab" data-panel="scanner" hidden>
         <div class="section-heading"><div><p class="eyebrow">BYBIT FIRST</p><h2>Market scanner</h2></div></div>
+        <form id="scanner-search-form" class="inline-form">
+          <label>종목 검색<input id="scanner-search-symbol" name="symbol" placeholder="HBAR" required></label>
+          <button type="submit">검색 및 즉시 분석</button>
+        </form>
+        <p id="scanner-search-status" class="muted" role="status"></p>
         <div class="toolbar"><label>Universe<select id="scanner-universe"><option>Bybit USDT perpetuals</option></select></label><label for="scanner-limit">Top symbols</label><input id="scanner-limit" name="scannerLimit" type="number" value="100" min="10" max="200"><button id="scanner-run" type="button">Run scanner</button></div>
         <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress><span>0 / 0</span></div>
         <div id="scanner-results" class="table-wrap"><p class="empty-state">Scanner results will appear here.</p></div>
