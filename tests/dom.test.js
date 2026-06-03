@@ -635,7 +635,7 @@ test("market heatmap renders theme scores and selectable asset tiles", () => {
   const text = flattenText(container);
   assert.equal(text.includes("Major"), true);
   assert.equal(text.includes("Strong"), true);
-  const [tile] = findNodes(container, (node) => node.tagName === "button" && node.attributes.class === "heatmap-row strength-strong");
+  const [tile] = findNodes(container, (node) => node.tagName === "button" && node.attributes.class?.includes("heatmap-bubble"));
   assert.ok(tile);
   tile.listeners.click();
   assert.deepEqual(selected, ["BTC"]);
@@ -662,12 +662,12 @@ test("market heatmap shows top five tiles and collapses remaining assets", () =>
     { dom },
   );
 
-  const visibleList = findNodes(container, (node) => node.attributes.class === "heatmap-list")[0];
-  assert.equal(findNodes(visibleList, (node) => node.attributes.class?.includes("heatmap-row")).length, 5);
+  const visibleMap = findNodes(container, (node) => node.attributes.class === "heatmap-bubble-map")[0];
+  assert.equal(findNodes(visibleMap, (node) => node.tagName === "button" && node.attributes.class?.includes("heatmap-bubble")).length, 5);
   assert.equal(flattenText(container).includes("전체 종목 보기"), true);
 });
 
-test("market heatmap renders compact vertical theme lists", () => {
+test("market heatmap renders bubble intelligence clusters instead of long vertical lists", () => {
   const dom = createDom(createFakeDocument());
   const container = new FakeNode("section");
   renderMarketHeatmap(
@@ -689,8 +689,10 @@ test("market heatmap renders compact vertical theme lists", () => {
   );
 
   assert.equal(findNodes(container, (node) => node.attributes.class === "heatmap-grid").length, 0);
-  assert.equal(findNodes(container, (node) => node.attributes.class === "heatmap-list").length, 1);
-  assert.equal(findNodes(container, (node) => node.attributes.class?.includes("heatmap-row")).length, 3);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "heatmap-bubble-map").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "heatmap-list").length, 0);
+  assert.equal(findNodes(container, (node) => node.attributes.class?.includes("heatmap-row")).length, 0);
+  assert.equal(findNodes(container, (node) => node.tagName === "button" && node.attributes.class?.includes("heatmap-bubble")).length, 3);
 });
 
 test("TradingView reference URL allowlists dashboard symbols", () => {

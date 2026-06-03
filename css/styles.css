@@ -130,7 +130,23 @@ h2 { margin-bottom: .25rem; }
 .recommendation-badge { font-weight: 800; }
 .compact-scanner-table td:last-child { min-width: 150px; }
 .heatmap-theme { margin-top: 1rem; }
-.heatmap-list { display: grid; gap: .4rem; }
+.heatmap-cluster { position: relative; overflow: hidden; border: 1px solid rgba(141, 166, 197, .16); border-radius: 16px; padding: .85rem; background: radial-gradient(circle at 20% 20%, rgba(66, 212, 255, .12), transparent 16rem), rgba(5, 14, 27, .48); }
+.heatmap-cluster::before { content: ""; position: absolute; inset: 3.2rem .9rem auto .9rem; height: 1px; background: linear-gradient(90deg, transparent, rgba(66, 212, 255, .32), transparent); }
+.heatmap-cluster.strength-strong { border-color: rgba(77, 214, 162, .38); }
+.heatmap-cluster.strength-weak { border-color: rgba(255, 113, 133, .34); }
+.heatmap-bubble-map { position: relative; display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; min-height: 118px; padding: 1rem .25rem .35rem; }
+.heatmap-bubble-map.is-secondary { min-height: auto; padding-top: .7rem; }
+.heatmap-bubble { display: inline-grid; place-items: center; align-content: center; gap: .08rem; min-width: 84px; min-height: 84px; border: 1px solid rgba(255, 204, 102, .52); border-radius: 999px; padding: .62rem; color: #fff; text-align: center; background: radial-gradient(circle at 35% 25%, rgba(255,255,255,.15), transparent 35%), linear-gradient(145deg, rgba(24, 88, 127, .84), rgba(7, 20, 38, .92)); box-shadow: 0 12px 28px rgba(0,0,0,.24), inset 0 0 18px rgba(255,255,255,.04); }
+.heatmap-bubble:hover { transform: translateY(-2px); box-shadow: 0 18px 34px rgba(0,0,0,.28), 0 0 22px rgba(66, 212, 255, .16); }
+.heatmap-bubble:disabled { opacity: .42; cursor: not-allowed; }
+.heatmap-bubble-md { width: 86px; height: 86px; }
+.heatmap-bubble-lg { width: 106px; height: 106px; }
+.heatmap-bubble-xl { width: 126px; height: 126px; }
+.heatmap-bubble.strength-strong { border-color: rgba(77, 214, 162, .72); color: var(--green); background: radial-gradient(circle at 35% 25%, rgba(77, 214, 162, .24), transparent 35%), linear-gradient(145deg, rgba(17, 92, 79, .9), rgba(7, 20, 38, .92)); }
+.heatmap-bubble.strength-weak { border-color: rgba(255, 113, 133, .68); color: var(--red); background: radial-gradient(circle at 35% 25%, rgba(255, 113, 133, .22), transparent 35%), linear-gradient(145deg, rgba(99, 32, 52, .9), rgba(7, 20, 38, .92)); }
+.heatmap-bubble .heatmap-symbol { color: #fff; font-size: .95rem; font-weight: 900; letter-spacing: .02em; }
+.heatmap-bubble-label { color: currentColor; font-size: .72rem; }
+.heatmap-bubble strong { font-size: .9rem; }
 .heatmap-row { display: grid; grid-template-columns: minmax(80px, 1fr) auto auto; align-items: center; gap: .65rem; text-align: left; background: rgba(14, 41, 72, .75); }
 .heatmap-symbol { color: #fff; font-weight: 800; }
 .heatmap-more { margin-top: .55rem; color: var(--slate); }

@@ -17,6 +17,13 @@ function scoreText(score) {
   return typeof score === "number" && Number.isFinite(score) ? score.toFixed(1) : "0.0";
 }
 
+function bubbleSizeClass(score) {
+  const value = typeof score === "number" && Number.isFinite(score) ? Math.abs(score) : 0;
+  if (value >= 60) return "heatmap-bubble-xl";
+  if (value >= 30) return "heatmap-bubble-lg";
+  return "heatmap-bubble-md";
+}
+
 export function renderMarketHeatmap(container, themes = {}, { dom, onSelect } = {}) {
   dom.clear(container);
   const entries = Object.entries(themes ?? {});
@@ -29,12 +36,12 @@ export function renderMarketHeatmap(container, themes = {}, { dom, onSelect } = 
       "button",
       {
         type: "button",
-        class: `heatmap-row ${strengthClass(safeRead(tile, "label", "Neutral"))}`,
+        class: `heatmap-bubble ${bubbleSizeClass(safeRead(tile, "score"))} ${strengthClass(safeRead(tile, "label", "Neutral"))}`,
         disabled: safeRead(tile, "status", "unavailable") !== "ready",
         onClick: () => onSelect?.(safeRead(tile, "symbol", "")),
       },
       dom.el("span", { class: "heatmap-symbol" }, safeText(safeRead(tile, "symbol"), "Unknown")),
-      dom.el("span", {}, safeText(safeRead(tile, "label"), "Neutral")),
+      dom.el("span", { class: "heatmap-bubble-label" }, safeText(safeRead(tile, "label"), "Neutral")),
       dom.el("strong", {}, scoreText(safeRead(tile, "score"))),
     );
   for (const [name, theme] of entries) {
@@ -45,19 +52,19 @@ export function renderMarketHeatmap(container, themes = {}, { dom, onSelect } = 
       container,
       dom.el(
         "section",
-        { class: "heatmap-theme" },
+        { class: `heatmap-theme heatmap-cluster ${strengthClass(safeRead(theme, "label", "Neutral"))}` },
         dom.el("div", { class: "section-heading" },
           dom.el("h3", {}, safeText(name, "Theme")),
           dom.el("span", { class: `strength-badge ${strengthClass(safeRead(theme, "label", "Neutral"))}` },
             `${safeText(safeRead(theme, "label"), "Neutral")} ${scoreText(safeRead(theme, "score"))}`),
         ),
-        dom.el("div", { class: "heatmap-list" },
+        dom.el("div", { class: "heatmap-bubble-map" },
           visibleTiles.map(renderTile),
         ),
         hiddenTiles.length
           ? dom.el("details", { class: "heatmap-more" },
               dom.el("summary", {}, "전체 종목 보기"),
-              dom.el("div", { class: "heatmap-list" }, hiddenTiles.map(renderTile)),
+              dom.el("div", { class: "heatmap-bubble-map is-secondary" }, hiddenTiles.map(renderTile)),
             )
           : null,
       ),
