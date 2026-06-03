@@ -57,18 +57,24 @@ export function activateTab(tab, root = document) {
   return true;
 }
 
-export function bindTabs(root = document) {
+export function bindTabs(root = document, options = {}) {
   const buttons = [...root.querySelectorAll("[data-tab]")];
+  const initialTab = TABS.includes(options.initialTab) ? options.initialTab : "manual";
+  const onChange = typeof options.onChange === "function" ? options.onChange : () => {};
   for (const [index, button] of buttons.entries()) {
-    button.addEventListener("click", () => activateTab(button.getAttribute("data-tab"), root));
+    button.addEventListener("click", () => {
+      const tab = button.getAttribute("data-tab");
+      if (activateTab(tab, root)) onChange(tab);
+    });
     button.addEventListener("keydown", (event) => {
       if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
       event.preventDefault();
       const direction = event.key === "ArrowRight" ? 1 : -1;
       const next = buttons[(index + direction + buttons.length) % buttons.length];
-      activateTab(next.getAttribute("data-tab"), root);
+      const tab = next.getAttribute("data-tab");
+      if (activateTab(tab, root)) onChange(tab);
       next.focus();
     });
   }
-  activateTab("manual", root);
+  activateTab(initialTab, root);
 }

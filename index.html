@@ -39,6 +39,7 @@
         <button id="manual-tab" type="button" role="tab" aria-controls="manual-panel" aria-selected="true" data-tab="manual">관심 종목</button>
         <button id="scanner-tab" type="button" role="tab" aria-controls="scanner-panel" aria-selected="false" data-tab="scanner">스캐너</button>
         <button id="market-tab" type="button" role="tab" aria-controls="market-panel" aria-selected="false" data-tab="market">시장</button>
+        <button id="backtest-tab" type="button" role="tab" aria-controls="backtest-panel" aria-selected="false" data-tab="backtest">백테스트</button>
       </nav>
       <section id="manual-panel" class="panel" role="tabpanel" aria-labelledby="manual-tab" data-panel="manual">
         <div class="section-heading">
@@ -86,7 +87,7 @@
         <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="스캐너 진행률"></progress><span>0 / 0</span></div>
         <div id="scanner-results" class="table-wrap"><p class="empty-state">스캐너 결과가 여기에 표시됩니다.</p></div>
       </section>
-      <section id="backtest-panel" class="panel" role="tabpanel" aria-label="백테스트 실험실" data-panel="backtest" hidden>
+      <section id="backtest-panel" class="panel" role="tabpanel" aria-labelledby="backtest-tab" data-panel="backtest" hidden>
         <div class="section-heading">
           <div>
             <p class="eyebrow">고급 과거 테스트</p>
@@ -149,13 +150,10 @@
         <div class="section-heading"><h2>설정</h2><button id="settings-close" type="button">닫기</button></div>
         <label class="toggle"><input name="persist" type="checkbox"> 이 기기에 대시보드 설정 저장</label>
         <p class="muted">설정 저장은 선택 사항입니다. API 데이터는 저장하지 않습니다.</p>
-        <details class="auxiliary-item"><summary>고급 도구</summary><button id="settings-backtest-open" type="button">백테스트 실험실 열기</button></details>
       </form>
     </dialog>
     <!--
       legacy-test-contract:
-      id="settings-backtest-open" type="button">Open backtest laboratory</button>
-      id="backtest-return-market" type="button">Return to market</button>
       id="market-refresh" type="button">Refresh heatmap</button>
       >醫낅ぉ ?뺤씤</button>
       <progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress>

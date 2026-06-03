@@ -1049,19 +1049,18 @@ test("strict backtest collections reject accessors and inherited indexes while r
   }
 });
 
-test("index exposes primary market navigation and hidden advanced backtest contracts", async () => {
+test("index exposes primary navigation including backtest", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 
   assert.match(html, /<nav class="tabs" role="tablist"/);
-  for (const tab of ["manual", "scanner", "market"]) {
+  for (const tab of ["manual", "scanner", "market", "backtest"]) {
     assert.match(html, new RegExp(`id="${tab}-tab"[^>]*role="tab"[^>]*aria-controls="${tab}-panel"[^>]*aria-selected="(?:true|false)"`));
     assert.match(html, new RegExp(`id="${tab}-panel"[^>]*role="tabpanel"[^>]*aria-labelledby="${tab}-tab"`));
   }
-  assert.doesNotMatch(html, /id="backtest-tab"/);
   assert.doesNotMatch(html, /id="auxiliary-tab"/);
-  assert.match(html, /id="backtest-panel"[^>]*role="tabpanel"[^>]*data-panel="backtest"[^>]*hidden/);
-  assert.match(html, /id="settings-backtest-open"[^>]*>Open backtest laboratory<\/button>/);
-  assert.match(html, /id="backtest-return-market"[^>]*>Return to market<\/button>/);
+  assert.match(html, /id="backtest-panel"[^>]*role="tabpanel"[^>]*aria-labelledby="backtest-tab"[^>]*data-panel="backtest"[^>]*hidden/);
+  assert.doesNotMatch(html, /id="settings-backtest-open"/);
+  assert.match(html, /id="backtest-return-market"[^>]*>시장으로 돌아가기<\/button>/);
   assert.match(html, /id="market-refresh"[^>]*>Refresh heatmap<\/button>/);
   assert.match(html, /id="market-heatmap"/);
   assert.match(html, /id="market-detail"/);
@@ -1090,7 +1089,7 @@ test("index exposes primary market navigation and hidden advanced backtest contr
 });
 
 test("tab controller updates aria state, visibility, and arrow-key focus", () => {
-  const buttons = ["manual", "scanner", "market"].map((tab) => {
+  const buttons = ["manual", "scanner", "market", "backtest"].map((tab) => {
     const button = new FakeNode("button");
     button.setAttribute("data-tab", tab);
     return button;
@@ -1106,7 +1105,9 @@ test("tab controller updates aria state, visibility, and arrow-key focus", () =>
     },
   };
 
-  bindTabs(root);
+  const changedTabs = [];
+  bindTabs(root, { initialTab: "backtest", onChange: (tab) => changedTabs.push(tab) });
+  assert.equal(panels[3].hidden, false);
   activateTab("scanner", root);
   assert.equal(buttons[1].getAttribute("aria-selected"), "true");
   assert.equal(panels[1].hidden, false);
@@ -1115,6 +1116,10 @@ test("tab controller updates aria state, visibility, and arrow-key focus", () =>
   buttons[1].listeners.keydown({ key: "ArrowRight", preventDefault() {} });
   assert.equal(buttons[2].focused, true);
   assert.equal(buttons[2].getAttribute("aria-selected"), "true");
+  buttons[2].listeners.keydown({ key: "ArrowRight", preventDefault() {} });
+  assert.equal(buttons[3].focused, true);
+  assert.equal(buttons[3].getAttribute("aria-selected"), "true");
+  assert.deepEqual(changedTabs, ["market", "backtest"]);
   assert.equal(activateTab("backtest", root), true);
   assert.equal(panels[3].hidden, false);
 });

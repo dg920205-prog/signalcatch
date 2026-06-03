@@ -11,6 +11,7 @@ import { createManualSearchService } from "./services/manual-search.js";
 import { createMarketService } from "./services/market.js";
 import { createScannerService } from "./services/scanner.js";
 import { createScannerSearchService } from "./services/scanner-search.js";
+import { createStorage } from "./storage.js";
 import { buildBacktestRequest, downloadBacktestCsv, renderBacktestMetrics, renderEquityCurve, renderExecutionCard, renderGroupedByMode, renderGroupedBySymbol, renderTrades } from "./ui/backtest-view.js";
 import { activateTab, bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
 import { dom } from "./ui/dom.js";
@@ -32,7 +33,7 @@ const elements = {
   dialog: document.querySelector("#settings-dialog"),
   openSettings: document.querySelector("#settings-open"),
   closeSettings: document.querySelector("#settings-close"),
-  openBacktest: document.querySelector("#settings-backtest-open"),
+  persistSettings: document.querySelector("input[name='persist']"),
   returnToMarket: document.querySelector("#backtest-return-market"),
   backtestDays: document.querySelector("#backtest-days"),
   backtestSymbols: document.querySelector("#backtest-symbols"),
@@ -54,6 +55,15 @@ const elements = {
   marketHeatmap: document.querySelector("#market-heatmap"),
   marketDetail: document.querySelector("#market-detail"),
 };
+
+const storage = createStorage(window.localStorage);
+let savedSettings = storage.load();
+if (savedSettings.ui.selectedMode) {
+  elements.recommendationMode.value = savedSettings.ui.selectedMode;
+}
+if (elements.persistSettings) {
+  elements.persistSettings.checked = savedSettings.persist;
+}
 
 const marketProfileById = new Map();
 const marketProfileLoader = createMarketProfileLoader();
@@ -352,11 +362,10 @@ async function verifyManualAsset(form) {
 function bindDialog() {
   elements.openSettings.addEventListener("click", () => elements.dialog.showModal());
   elements.closeSettings.addEventListener("click", () => elements.dialog.close());
-  elements.openBacktest.addEventListener("click", () => {
-    elements.dialog.close();
-    activateTab("backtest");
+  elements.returnToMarket.addEventListener("click", () => {
+    if (activateTab("market")) saveUiState({ activeTab: "market" });
   });
-  elements.returnToMarket.addEventListener("click", () => activateTab("market"));
+  elements.persistSettings.addEventListener("change", () => saveUiState());
 }
 
 function bindBacktestPresets() {
@@ -379,7 +388,26 @@ function bindManualForm() {
 }
 
 function bindRecommendationMode() {
-  elements.recommendationMode.addEventListener("change", rerender);
+  elements.recommendationMode.addEventListener("change", () => {
+    rerender();
+    saveUiState({ selectedMode: elements.recommendationMode.value });
+  });
+}
+
+function activeTab() {
+  return document.querySelector("[data-tab].is-active")?.getAttribute("data-tab") ?? "manual";
+}
+
+function saveUiState(nextUi = {}) {
+  const persist = elements.persistSettings.checked;
+  const ui = {
+    ...savedSettings.ui,
+    activeTab: activeTab(),
+    selectedMode: elements.recommendationMode.value,
+    ...nextUi,
+  };
+  savedSettings = { ...savedSettings, persist, ui };
+  storage.save(savedSettings);
 }
 
 function bindBacktestForm() {
@@ -450,7 +478,10 @@ function bindMarket() {
   elements.marketRefresh.addEventListener("click", refreshMarket);
 }
 
-bindTabs();
+bindTabs(document, {
+  initialTab: savedSettings.ui.activeTab,
+  onChange: (activeTab) => saveUiState({ activeTab }),
+});
 bindDialog();
 bindBacktestPresets();
 bindManualForm();

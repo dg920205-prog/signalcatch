@@ -117,7 +117,7 @@ test("load restores sanitized settings", () => {
   });
 });
 
-test("storage accepts market as a primary tab and drops hidden backtest state", () => {
+test("storage accepts market and backtest as primary tabs", () => {
   const marketBackend = createMemoryStorage({
     [STORAGE_KEY]: JSON.stringify({ persist: true, ui: { activeTab: "market" } }),
   });
@@ -126,7 +126,7 @@ test("storage accepts market as a primary tab and drops hidden backtest state", 
   });
 
   assert.deepEqual(createStorage(marketBackend).load().ui, { activeTab: "market" });
-  assert.deepEqual(createStorage(backtestBackend).load().ui, {});
+  assert.deepEqual(createStorage(backtestBackend).load().ui, { activeTab: "backtest" });
 });
 
 test("load returns safe defaults for malformed JSON and backend errors", () => {
