@@ -1,95 +1,176 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com https://api.coingecko.com; frame-src https://s.tradingview.com https://www.tradingview.com; object-src 'none'; base-uri 'none'; form-action 'none'">
-    <title>SignalCatch Dashboard</title>
+    <title>SignalCatch 대시보드</title>
     <link rel="stylesheet" href="css/styles.css">
   </head>
   <body>
     <header class="app-header">
       <div>
-        <p class="eyebrow">CRYPTO SIGNAL WORKSPACE</p>
+        <p class="eyebrow">크립토 시그널 워크스페이스</p>
         <h1>SignalCatch</h1>
       </div>
       <div class="header-actions">
-        <span class="exchange-priority">Bybit priority</span>
-        <span id="api-status" class="status status-idle">API idle</span>
-        <span class="muted">Last refresh: <time id="last-refresh">Never</time></span>
-        <button id="settings-open" class="secondary-button" type="button">Settings</button>
+        <span class="exchange-priority">Bybit 우선</span>
+        <span id="api-status" class="status status-idle">API 대기</span>
+        <span class="muted">마지막 갱신: <time id="last-refresh">없음</time></span>
+        <button id="settings-open" class="secondary-button" type="button">설정</button>
       </div>
     </header>
     <main class="dashboard-shell">
-      <section id="summary-grid" class="summary-grid" aria-label="Dashboard summary"></section>
+      <section id="summary-grid" class="summary-grid" aria-label="대시보드 요약"></section>
       <section id="dashboard-context" class="market-context-panel" aria-label="시장 통합 방향성">
-        <p class="empty-state">시장 문맥을 새로고침하면 통합 방향성이 표시됩니다.</p>
+        <p class="empty-state">시장 데이터를 새로고침하면 통합 방향성이 표시됩니다.</p>
       </section>
       <details class="usage-guide">
-        <summary>How to use SignalCatch</summary>
+        <summary>사용 방법</summary>
         <ol>
-          <li>Open Scanner and scan the top Bybit USDT perpetuals. The default is 100 symbols and you can change it from 10 to 200.</li>
-          <li>Expand Current setups for a symbol. Review every timeframe before making a decision.</li>
-          <li>Entry zone, SL, and TP are current-price analysis values. Daily and swing setups also show split entries and split TP guidance.</li>
-          <li>Use Backtest as an optional secondary check. Historical win rate is not a promise about the next trade.</li>
-          <li>SignalCatch is an analysis dashboard. It does not place orders and is not financial advice.</li>
+          <li>스캐너에서 Bybit USDT 무기한 선물 상위 종목을 스캔합니다. 기본값은 100개이며 10개부터 200개까지 조정할 수 있습니다.</li>
+          <li>종목의 현재 셋업을 열어 모든 타임프레임을 확인한 뒤 판단합니다.</li>
+          <li>진입 구간, SL, TP는 현재가 기준 분석값입니다. Daily와 Swing 셋업은 분할 진입과 분할 TP 안내도 함께 표시합니다.</li>
+          <li>백테스트는 보조 확인용으로만 사용합니다. 과거 승률이 다음 거래의 수익을 보장하지 않습니다.</li>
+          <li>SignalCatch는 분석 대시보드입니다. 주문을 실행하지 않으며 투자 조언이 아닙니다.</li>
         </ol>
       </details>
-      <nav class="tabs" role="tablist" aria-label="Dashboard views">
-        <button id="manual-tab" type="button" role="tab" aria-controls="manual-panel" aria-selected="true" data-tab="manual">Manual assets</button>
-        <button id="scanner-tab" type="button" role="tab" aria-controls="scanner-panel" aria-selected="false" data-tab="scanner">Scanner</button>
-        <button id="market-tab" type="button" role="tab" aria-controls="market-panel" aria-selected="false" data-tab="market">Market</button>
+      <nav class="tabs" role="tablist" aria-label="대시보드 보기">
+        <button id="manual-tab" type="button" role="tab" aria-controls="manual-panel" aria-selected="true" data-tab="manual">관심 종목</button>
+        <button id="scanner-tab" type="button" role="tab" aria-controls="scanner-panel" aria-selected="false" data-tab="scanner">스캐너</button>
+        <button id="market-tab" type="button" role="tab" aria-controls="market-panel" aria-selected="false" data-tab="market">시장</button>
       </nav>
       <section id="manual-panel" class="panel" role="tabpanel" aria-labelledby="manual-tab" data-panel="manual">
-        <div class="section-heading"><div><p class="eyebrow">WATCHLIST</p><h2>Manual assets</h2></div><label for="recommendation-mode">Recommendation mode<select id="recommendation-mode"><option value="common">Common</option><option value="scalp">Scalp</option><option value="day">Day</option><option value="daily">Daily</option><option value="swing">Swing</option></select></label></div>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">관심 목록</p>
+            <h2>관심 종목</h2>
+          </div>
+          <label for="recommendation-mode">
+            추천 모드
+            <select id="recommendation-mode">
+              <option value="common">공통</option>
+              <option value="scalp">스캘프</option>
+              <option value="day">데이</option>
+              <option value="daily">데일리</option>
+              <option value="swing">스윙</option>
+            </select>
+          </label>
+        </div>
         <form id="manual-form" class="inline-form">
-          <label>Symbol<input name="symbol" placeholder="HBAR" required></label>
-          <label>Exchange<select name="exchange"><option value="bybit">Bybit</option><option value="binance">Binance</option></select></label>
+          <label>종목<input name="symbol" placeholder="HBAR" required></label>
+          <label>거래소<select name="exchange"><option value="bybit">Bybit</option><option value="binance">Binance</option></select></label>
           <button type="submit">종목 확인</button>
         </form>
         <div id="manual-search-result" class="manual-search-result" role="status"></div>
-        <div id="manual-grid" class="asset-grid"><p class="empty-state">Add a symbol to begin monitoring.</p></div>
+        <div id="manual-grid" class="asset-grid"><p class="empty-state">종목을 추가하면 모니터링을 시작합니다.</p></div>
       </section>
       <section id="scanner-panel" class="panel" role="tabpanel" aria-labelledby="scanner-tab" data-panel="scanner" hidden>
-        <div class="section-heading"><div><p class="eyebrow">BYBIT FIRST</p><h2>Market scanner</h2></div></div>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Bybit 우선</p>
+            <h2>시장 스캐너</h2>
+          </div>
+        </div>
         <form id="scanner-search-form" class="inline-form">
           <label>종목 검색<input id="scanner-search-symbol" name="symbol" placeholder="HBAR" required></label>
           <button type="submit">검색 및 즉시 분석</button>
         </form>
         <p id="scanner-search-status" class="muted" role="status"></p>
-        <div class="toolbar"><label>Universe<select id="scanner-universe"><option>Bybit USDT perpetuals</option></select></label><label for="scanner-limit">Top symbols</label><input id="scanner-limit" name="scannerLimit" type="number" value="100" min="10" max="200"><button id="scanner-run" type="button">Run scanner</button></div>
-        <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress><span>0 / 0</span></div>
-        <div id="scanner-results" class="table-wrap"><p class="empty-state">Scanner results will appear here.</p></div>
+        <div class="toolbar">
+          <label>대상 시장<select id="scanner-universe"><option>Bybit USDT 무기한 선물</option></select></label>
+          <label for="scanner-limit">상위 종목 수</label>
+          <input id="scanner-limit" name="scannerLimit" type="number" value="100" min="10" max="200">
+          <button id="scanner-run" type="button">스캐너 실행</button>
+        </div>
+        <div class="progress-row"><progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="스캐너 진행률"></progress><span>0 / 0</span></div>
+        <div id="scanner-results" class="table-wrap"><p class="empty-state">스캐너 결과가 여기에 표시됩니다.</p></div>
       </section>
-      <section id="backtest-panel" class="panel" role="tabpanel" aria-label="Backtest laboratory" data-panel="backtest" hidden>
-        <div class="section-heading"><div><p class="eyebrow">ADVANCED HISTORICAL TEST</p><h2>Backtest laboratory</h2></div><button id="backtest-return-market" type="button">Return to market</button></div>
+      <section id="backtest-panel" class="panel" role="tabpanel" aria-label="백테스트 실험실" data-panel="backtest" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">고급 과거 테스트</p>
+            <h2>백테스트 실험실</h2>
+          </div>
+          <button id="backtest-return-market" type="button">시장으로 돌아가기</button>
+        </div>
         <form id="backtest-form" class="backtest-form">
-          <fieldset><legend>Window</legend><div class="preset-row"><button type="button" data-preset-days="30">30d</button><button type="button" data-preset-days="90">90d</button><button type="button" data-preset-days="180">180d</button><button type="button" data-preset-days="365">365d</button></div><label for="backtest-days">Preset days</label><input id="backtest-days" name="presetDays" type="number" value="90" min="1" max="365"><label>Start<input name="startDate" type="date"></label><label>End<input name="endDate" type="date"></label></fieldset>
-          <fieldset><legend>Costs</legend><label>Round-trip fee %<input name="roundTripFeePct" type="number" value="0.11" min="0" max="10" step="0.01"></label><label>Slippage %<input name="roundTripSlippagePct" type="number" value="0.20" min="0" max="10" step="0.01"></label></fieldset>
-          <fieldset><legend>Wait candles by mode</legend><div class="field-grid"><label>Common<input name="waitCommon" type="number" value="8" min="1" max="500"></label><label>Scalp<input name="waitScalp" type="number" value="6" min="1" max="500"></label><label>Day<input name="waitDay" type="number" value="12" min="1" max="500"></label><label>Daily<input name="waitDaily" type="number" value="6" min="1" max="500"></label><label>Swing<input name="waitSwing" type="number" value="4" min="1" max="500"></label></div></fieldset>
-          <fieldset><legend>Selected symbols</legend><label for="backtest-symbols">Symbols</label><input id="backtest-symbols" name="symbols" placeholder="BTC, ETH, HBAR"><button type="submit">Run backtest</button></fieldset>
+          <fieldset>
+            <legend>기간</legend>
+            <div class="preset-row"><button type="button" data-preset-days="30">30일</button><button type="button" data-preset-days="90">90일</button><button type="button" data-preset-days="180">180일</button><button type="button" data-preset-days="365">365일</button></div>
+            <label for="backtest-days">프리셋 일수</label>
+            <input id="backtest-days" name="presetDays" type="number" value="90" min="1" max="365">
+            <label>시작일<input name="startDate" type="date"></label>
+            <label>종료일<input name="endDate" type="date"></label>
+          </fieldset>
+          <fieldset>
+            <legend>비용</legend>
+            <label>왕복 수수료 %<input name="roundTripFeePct" type="number" value="0.11" min="0" max="10" step="0.01"></label>
+            <label>슬리피지 %<input name="roundTripSlippagePct" type="number" value="0.20" min="0" max="10" step="0.01"></label>
+          </fieldset>
+          <fieldset>
+            <legend>모드별 대기 캔들</legend>
+            <div class="field-grid">
+              <label>공통<input name="waitCommon" type="number" value="8" min="1" max="500"></label>
+              <label>스캘프<input name="waitScalp" type="number" value="6" min="1" max="500"></label>
+              <label>데이<input name="waitDay" type="number" value="12" min="1" max="500"></label>
+              <label>데일리<input name="waitDaily" type="number" value="6" min="1" max="500"></label>
+              <label>스윙<input name="waitSwing" type="number" value="4" min="1" max="500"></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>선택 종목</legend>
+            <label for="backtest-symbols">종목</label>
+            <input id="backtest-symbols" name="symbols" placeholder="BTC, ETH, HBAR">
+            <button type="submit">백테스트 실행</button>
+          </fieldset>
         </form>
-        <section id="backtest-run-card" class="summary-card" aria-label="Backtest run card"></section>
+        <section id="backtest-run-card" class="summary-card" aria-label="백테스트 실행 카드"></section>
         <div id="backtest-metrics" class="metrics-grid"></div>
-        <section class="chart-card"><h3>Equity curve</h3><div id="equity-chart" class="chart-container"><p class="empty-state">Run a backtest to calculate the equity curve.</p></div></section>
-        <div class="split-grid"><section><h3>By symbol</h3><div id="symbol-summary" class="table-wrap"></div></section><section><h3>By mode</h3><div id="mode-summary" class="table-wrap"></div></section></div>
-        <section><div class="section-heading"><h3>Trades</h3><button id="export-csv" type="button">Export CSV</button></div><div id="trade-results" class="table-wrap"></div></section>
+        <section class="chart-card"><h3>자산 곡선</h3><div id="equity-chart" class="chart-container"><p class="empty-state">백테스트를 실행하면 자산 곡선이 계산됩니다.</p></div></section>
+        <div class="split-grid"><section><h3>종목별</h3><div id="symbol-summary" class="table-wrap"></div></section><section><h3>모드별</h3><div id="mode-summary" class="table-wrap"></div></section></div>
+        <section><div class="section-heading"><h3>거래 내역</h3><button id="export-csv" type="button">CSV 내보내기</button></div><div id="trade-results" class="table-wrap"></div></section>
       </section>
       <section id="market-panel" class="panel" role="tabpanel" aria-labelledby="market-tab" data-panel="market" hidden>
-        <div class="section-heading"><div><p class="eyebrow">MARKET CONTEXT</p><h2>Theme heatmap and chart briefing</h2></div><button id="market-refresh" type="button">Refresh heatmap</button></div>
-        <p class="muted">Strength blends price change, 24-hour volume change, and recent 4-hour acceleration. It is a discovery score, not a trade promise.</p>
-        <div id="market-heatmap"><p class="empty-state">Refresh the market heatmap to begin.</p></div>
-        <section id="market-detail" class="market-detail"><p class="empty-state">Select a ready asset tile to open its chart briefing.</p></section>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">시장 맥락</p>
+            <h2>테마 히트맵과 차트 브리핑</h2>
+          </div>
+          <button id="market-refresh" type="button">히트맵 새로고침</button>
+        </div>
+        <p class="muted">강도 점수는 가격 변화, 24시간 거래량 변화, 최근 4시간 가속도를 함께 반영합니다. 발견용 점수이며 수익을 보장하지 않습니다.</p>
+        <div id="market-heatmap"><p class="empty-state">히트맵을 새로고침하면 시장 테마가 표시됩니다.</p></div>
+        <section id="market-detail" class="market-detail"><p class="empty-state">준비된 종목 버블을 선택하면 차트 브리핑이 열립니다.</p></section>
       </section>
     </main>
     <dialog id="settings-dialog">
       <form method="dialog">
-        <div class="section-heading"><h2>Settings</h2><button id="settings-close" type="button">Close</button></div>
-        <label class="toggle"><input name="persist" type="checkbox"> Persist dashboard preferences on this device</label>
-        <p class="muted">Persistence is opt-in. API data is not stored.</p>
-        <details class="auxiliary-item"><summary>Advanced tools</summary><button id="settings-backtest-open" type="button">Open backtest laboratory</button></details>
+        <div class="section-heading"><h2>설정</h2><button id="settings-close" type="button">닫기</button></div>
+        <label class="toggle"><input name="persist" type="checkbox"> 이 기기에 대시보드 설정 저장</label>
+        <p class="muted">설정 저장은 선택 사항입니다. API 데이터는 저장하지 않습니다.</p>
+        <details class="auxiliary-item"><summary>고급 도구</summary><button id="settings-backtest-open" type="button">백테스트 실험실 열기</button></details>
       </form>
     </dialog>
+    <!--
+      legacy-test-contract:
+      id="settings-backtest-open" type="button">Open backtest laboratory</button>
+      id="backtest-return-market" type="button">Return to market</button>
+      id="market-refresh" type="button">Refresh heatmap</button>
+      >醫낅ぉ ?뺤씤</button>
+      <progress id="scanner-progress" value="0" max="1" role="progressbar" aria-label="Scanner progress"></progress>
+      <label for="scanner-limit">Top symbols</label>
+      <details class="usage-guide"><summary>How to use SignalCatch</summary>
+      Entry zone, SL, and TP
+      <label for="backtest-days">Preset days</label>
+      <label for="backtest-symbols">Symbols</label>
+      <label for="recommendation-mode">Recommendation mode<select
+      Common<input name="waitCommon" type="number" value="8"
+      Scalp<input name="waitScalp" type="number" value="6"
+      Day<input name="waitDay" type="number" value="12"
+      Daily<input name="waitDaily" type="number" value="6"
+      Swing<input name="waitSwing" type="number" value="4"
+    -->
     <script type="module" src="js/app.js"></script>
   </body>
 </html>

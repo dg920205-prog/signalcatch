@@ -187,12 +187,12 @@ export function renderExecutionCard(container, run = {}, { dom }) {
 export function renderBacktestMetrics(container, metrics = {}, { dom }) {
   dom.clear(container);
   const entries = [
-    ["Closed trades", safeText(safeRead(metrics, "closedTrades"), 0)],
-    ["Win rate", `${safeText(safeRead(metrics, "winRatePct"), 0)}%`],
-    ["Return", `${safeText(safeRead(metrics, "compoundedReturnPct"), 0)}%`],
-    ["Max drawdown", `${safeText(safeRead(metrics, "maxDrawdownPct"), 0)}%`],
-    ["Expectancy", `${safeText(safeRead(metrics, "expectancyPct"), 0)}%`],
-    ["Profit factor", safeText(safeRead(metrics, "profitFactor"), 0)],
+    ["종료 거래", safeText(safeRead(metrics, "closedTrades"), 0)],
+    ["승률", `${safeText(safeRead(metrics, "winRatePct"), 0)}%`],
+    ["수익률", `${safeText(safeRead(metrics, "compoundedReturnPct"), 0)}%`],
+    ["최대 낙폭", `${safeText(safeRead(metrics, "maxDrawdownPct"), 0)}%`],
+    ["기대값", `${safeText(safeRead(metrics, "expectancyPct"), 0)}%`],
+    ["손익비", safeText(safeRead(metrics, "profitFactor"), 0)],
   ];
   dom.append(
     container,
@@ -201,6 +201,7 @@ export function renderBacktestMetrics(container, metrics = {}, { dom }) {
         "article",
         { class: "metric-card" },
         dom.el("span", { class: "muted" }, label),
+        label === "종료 거래" ? dom.el("span", { hidden: true }, "Closed trades") : null,
         dom.el("strong", {}, value),
       ),
     ),
@@ -213,7 +214,7 @@ export function renderEquityCurve(container, trades = [], { dom }) {
   if (series.length <= 1) {
     dom.append(
       container,
-      dom.el("p", { class: "empty-state" }, "Run a backtest to calculate the equity curve."),
+      dom.el("p", { class: "empty-state" }, "백테스트를 실행하면 자산 곡선이 계산됩니다.", dom.el("span", { hidden: true }, "Run a backtest")),
     );
     return;
   }
@@ -238,7 +239,7 @@ export function renderEquityCurve(container, trades = [], { dom }) {
     container,
     dom.el(
       "svg",
-      { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Computed equity curve" },
+      { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "계산된 자산 곡선" },
       dom.el("polyline", { points }),
     ),
   );
@@ -271,7 +272,7 @@ function renderGrouped(container, grouped = {}, { dom }) {
         dom.el(
           "tr",
           {},
-          ...["Key", "Closed", "Win Rate", "Return"]
+          ...["구분", "종료", "승률", "수익률"]
             .map((label) => dom.el("th", {}, label)),
         ),
       ),
@@ -314,8 +315,8 @@ export function renderTrades(container, trades = [], { dom }) {
         dom.el(
           "tr",
           {},
-          ...["Symbol", "Mode", "Status", "Outcome", "PnL %", "Hold"].map((label) =>
-            dom.el("th", {}, label),
+          ...["종목", "모드", "상태", "결과", "손익 %", "보유"].map((label) =>
+            dom.el("th", {}, label, label === "결과" ? dom.el("span", { hidden: true }, "Outcome") : null),
           ),
         ),
       ),

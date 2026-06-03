@@ -53,7 +53,7 @@ function recommendationGroup(label) {
 
 function metricText(label, value, suffix = "") {
   return typeof value === "number" && Number.isFinite(value)
-    ? `${label} ${value.toFixed(label === "trend" ? 3 : 1)}${suffix}`
+    ? `${label} ${value.toFixed(label === "추세" ? 3 : 1)}${suffix}`
     : `${label} -`;
 }
 
@@ -70,8 +70,8 @@ function renderSetupExplanation(setup, plan, dom) {
     ),
     dom.el("div", { class: "setup-metrics" },
       dom.el("span", {}, metricText("신뢰도", safeRead(analysis, "confidence"), "%")),
-      dom.el("span", {}, metricText("volume", safeRead(analysis, "volumeRatio"))),
-      dom.el("span", {}, metricText("trend", safeRead(analysis, "trendStrength"))),
+      dom.el("span", {}, metricText("거래량", safeRead(analysis, "volumeRatio"))),
+      dom.el("span", {}, metricText("추세", safeRead(analysis, "trendStrength"))),
     ),
     dom.el("ul", { class: "setup-reasons" },
       reasons.length
@@ -93,7 +93,7 @@ function renderSetupDetails(candidate, dom) {
         dom.el("span", { class: "recommendation-badge" }, recommendationBadge(safeRead(recommendation, "label"))),
       ),
       dom.el("div", { class: "setup-card-meta" },
-        dom.el("span", {}, `방향 ${safeText(safeRead(setup, "direction"), "neutral")}`),
+        dom.el("span", {}, `방향 ${safeText(safeRead(setup, "direction"), "중립")}`),
       ),
       dom.el("div", { class: "setup-stat-grid" },
         dom.el("div", { class: "setup-stat setup-entry" },
@@ -125,7 +125,7 @@ function renderSetupDetails(candidate, dom) {
 export function renderScannerResults(container, candidates = [], { dom } = {}) {
   dom.clear(container);
   const rows = snapshotArray(candidates).values.map((candidate) => {
-    const symbol = safeText(safeRead(candidate, "symbol"), "Unknown");
+    const symbol = safeText(safeRead(candidate, "symbol"), "알 수 없음");
     const bestSetup = selectStrongestSetup(safeRead(candidate, "setups", {}));
     const group = recommendationGroup(safeRead(safeRead(bestSetup, "recommendation", {}), "label"));
     return {
@@ -139,7 +139,7 @@ export function renderScannerResults(container, candidates = [], { dom } = {}) {
       dom.el("div", { class: "scanner-result-summary" },
         dom.el("span", {}, `현재가 ${formatPrice(safeRead(candidate, "price"))}`),
         dom.el("span", {}, `셋업 ${safeText(safeRead(bestSetup, "mode"), "-")}`),
-        dom.el("span", {}, `방향 ${safeText(safeRead(bestSetup, "direction"), "neutral")}`),
+        dom.el("span", {}, `방향 ${safeText(safeRead(bestSetup, "direction"), "중립")}`),
       ),
       renderSetupDetails(candidate, dom),
       ),

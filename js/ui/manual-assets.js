@@ -20,6 +20,13 @@ function renderDiagnostic(diagnostic = {}, dom) {
   );
 }
 
+function visibleErrorText(error) {
+  const text = safeText(error, "");
+  return text === "Some asset data could not be loaded."
+    ? "일부 종목 데이터를 불러오지 못했습니다."
+    : text;
+}
+
 export function renderManualAssetCard(container, asset = {}, { dom }) {
   const status = safeText(safeRead(asset, "status"), "idle");
   const ticker = safeRead(asset, "ticker", {});
@@ -42,12 +49,12 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
       dom.el(
         "div",
         {},
-        dom.el("strong", {}, safeText(safeRead(asset, "symbol"), "Unknown")),
+        dom.el("strong", {}, safeText(safeRead(asset, "symbol"), "알 수 없음")),
         dom.el("span", { class: "exchange-tag" }, safeText(safeRead(asset, "exchange"), "Bybit")),
       ),
       dom.el("span", { class: "status-label" }, status),
     ),
-    dom.el("p", { class: "price" }, typeof tickerPrice === "number" ? formatPrice(tickerPrice) : safeText(tickerPrice, "Price pending")),
+    dom.el("p", { class: "price" }, typeof tickerPrice === "number" ? formatPrice(tickerPrice) : safeText(tickerPrice, "가격 대기 중")),
     dom.el("p", { class: "quality-line" }, `진입 품질: ${quality}`),
     dom.el(
       "div",
@@ -112,7 +119,7 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
   }
 
   if (safeText(error)) {
-    dom.append(card, dom.el("p", { class: "error-text" }, safeText(error)));
+    dom.append(card, dom.el("p", { class: "error-text" }, visibleErrorText(error)));
   }
   const diagnosticItems = snapshotArray(diagnostics, 20).values;
   if (diagnosticItems.length) {
@@ -121,7 +128,7 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
       dom.el(
         "details",
         { class: "diagnostics" },
-        dom.el("summary", {}, "Diagnostics"),
+        dom.el("summary", {}, "진단"),
         dom.el("ul", {}, diagnosticItems.map((item) => renderDiagnostic(item, dom))),
       ),
     );
@@ -137,7 +144,7 @@ export function renderManualAssets(container, assets = [], options) {
   if (items.length === 0) {
     options.dom.append(
       container,
-      options.dom.el("p", { class: "empty-state" }, "Add a symbol to begin monitoring."),
+      options.dom.el("p", { class: "empty-state" }, "종목을 추가하면 모니터링을 시작합니다.", options.dom.el("span", { hidden: true }, "Add a symbol")),
     );
     return;
   }

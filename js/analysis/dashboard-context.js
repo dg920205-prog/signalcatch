@@ -115,7 +115,7 @@ export function buildDashboardContext({
     score,
     direction,
     label,
-    scoreNote: "4H trend + relative strength + Bybit breadth",
+    scoreNote: "4H 추세 + 상대 강도 + Bybit 시장 폭",
     automatedInputs: [...AUTOMATED_INPUTS],
     referenceIndicators: [...REFERENCE_INDICATORS],
     satoshiLeaders: buildSatoshiLeaders(altTiles, btcScore),

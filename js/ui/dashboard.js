@@ -13,7 +13,7 @@ function safeRead(value, key, fallback) {
 export function setApiStatus(node, status, { dom }) {
   const normalized = ["ready", "loading", "error"].includes(status) ? status : "idle";
   node.className = `status status-${normalized}`;
-  dom.setText(node, normalized === "ready" ? "API ready" : normalized === "loading" ? "Checking API" : normalized === "error" ? "API unavailable" : "API idle");
+  dom.setText(node, normalized === "ready" ? "API 정상" : normalized === "loading" ? "API 확인 중" : normalized === "error" ? "API 오류" : "API 대기");
 }
 
 export function renderSummary(container, summary = {}, { dom }) {

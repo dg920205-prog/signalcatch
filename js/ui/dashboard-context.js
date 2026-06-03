@@ -20,7 +20,7 @@ function points(values) {
 }
 
 function renderMiniChart(card, dom) {
-  return dom.svgEl("svg", { class: "context-mini-chart", viewBox: "0 0 100 40", "aria-label": `${safeRead(card, "symbol")} mini chart` },
+  return dom.svgEl("svg", { class: "context-mini-chart", viewBox: "0 0 100 40", "aria-label": `${safeRead(card, "symbol")} 미니 차트` },
     dom.svgEl("polyline", { points: points(safeRead(card, "series", [])) }),
   );
 }
@@ -32,6 +32,14 @@ function renderStrengthMeter(value, dom) {
   );
 }
 
+function strengthText(label) {
+  const value = String(label ?? "Neutral");
+  if (value === "Strong") return "강세";
+  if (value === "Weak") return "약세";
+  if (value === "Neutral") return "중립";
+  return value;
+}
+
 function renderCard(card, dom, onSelect) {
   const source = safeRead(card, "source") === "reference" ? "시각 참고" : "자동 반영";
   return dom.el("button", {
@@ -40,12 +48,12 @@ function renderCard(card, dom, onSelect) {
     onClick: () => onSelect?.(safeRead(card, "symbol")),
   },
     dom.el("span", { class: "context-card-top" },
-      dom.el("strong", {}, safeRead(card, "symbol", "Unknown")),
+      dom.el("strong", {}, safeRead(card, "symbol", "알 수 없음")),
       dom.el("span", { class: "source-badge" }, source),
     ),
     renderMiniChart(card, dom),
     renderStrengthMeter(safeRead(card, "score", 0), dom),
-    dom.el("span", { class: "context-direction" }, safeRead(card, "direction", "● 중립")),
+    dom.el("span", { class: "context-direction" }, safeRead(card, "direction", "중립")),
     dom.el("span", { class: "muted" }, safeRead(card, "interpretation", "")),
   );
 }
@@ -55,13 +63,13 @@ function renderSatoshiLeaders(leaders, dom) {
   return dom.el("section", { class: "satoshi-leaders" },
     dom.el("div", { class: "section-heading" },
       dom.el("h3", {}, "BTC 대비 강세 TOP"),
-      dom.el("span", { class: "muted" }, "USDT 변화율을 BTC 흐름과 비교한 가벼운 상대강도"),
+      dom.el("span", { class: "muted" }, "USDT 변동률을 BTC 흐름과 비교한 상대 강도"),
     ),
     rows.length
       ? dom.el("div", { class: "satoshi-leader-list" }, rows.map((leader) =>
           dom.el("div", { class: `satoshi-leader strength-${String(safeRead(leader, "label", "Neutral")).toLowerCase()}` },
             dom.el("strong", {}, safeRead(leader, "symbol", "UNKNOWN/BTC")),
-            dom.el("span", {}, safeRead(leader, "label", "Neutral")),
+            dom.el("span", {}, strengthText(safeRead(leader, "label"))),
             dom.el("span", {}, `${Number(safeRead(leader, "score", 0)).toFixed(1)}`),
           ),
         ))
@@ -85,17 +93,17 @@ export function renderDashboardContext(container, context = {}, { dom, onSelect 
     dom.el("div", { class: "context-intelligence-grid" },
       dom.el("div", { class: "context-banner" },
         dom.el("div", {},
-          dom.el("p", { class: "eyebrow" }, "MARKET INTELLIGENCE"),
+          dom.el("p", { class: "eyebrow" }, "시장 인텔리전스"),
           dom.el("h2", {}, safeRead(context, "label", "시장 방향성 대기")),
         ),
         dom.el("p", { class: "muted" }, `자동 반영: ${(safeRead(context, "automatedInputs", [])).join(", ")}`),
-        dom.el("p", { class: "muted" }, `점수 기준: ${safeRead(context, "scoreNote", "4H trend + relative strength + breadth")}`),
+        dom.el("p", { class: "muted" }, `점수 기준: ${safeRead(context, "scoreNote", "4H 추세 + 상대 강도 + 시장 폭")}`),
         renderReferenceChips(safeRead(context, "referenceIndicators", []), dom),
       ),
       renderSatoshiLeaders(safeRead(context, "satoshiLeaders", []), dom),
     ),
     dom.el("details", { class: "market-context-details" },
-      dom.el("summary", {}, "핵심 시장 입력 보기"),
+      dom.el("summary", {}, "통합 시장 입력 보기"),
       dom.el("div", { class: "market-context-grid" }, automatedCards.map((card) => renderCard(card, dom, onSelect))),
     ),
   );
