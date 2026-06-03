@@ -48,6 +48,8 @@ h2 { margin-bottom: .25rem; }
 .section-heading label { min-width: 180px; }
 .inline-form { margin-bottom: 1rem; }
 .inline-form label { min-width: 180px; }
+.manual-search-result { margin: -.35rem 0 1rem; }
+.verified-result { display: inline-flex; align-items: center; gap: .75rem; border: 1px solid var(--line); border-radius: 8px; padding: .55rem .7rem; background: var(--navy-900); }
 .asset-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .card-heading { display: flex; justify-content: space-between; gap: 1rem; }
 .exchange-tag { margin-left: .5rem; color: var(--cyan); }

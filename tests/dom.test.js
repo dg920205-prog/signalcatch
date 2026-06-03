@@ -791,6 +791,8 @@ test("index exposes primary market navigation and hidden advanced backtest contr
   assert.match(html, /id="market-refresh"[^>]*>Refresh heatmap<\/button>/);
   assert.match(html, /id="market-heatmap"/);
   assert.match(html, /id="market-detail"/);
+  assert.match(html, /id="manual-search-result"[^>]*role="status"/);
+  assert.match(html, />종목 확인<\/button>/);
   assert.match(html, /<progress id="scanner-progress"[^>]*role="progressbar"[^>]*aria-label="Scanner progress"/);
   assert.match(html, /id="scanner-search-form"/);
   assert.match(html, /id="scanner-search-symbol"[^>]*name="symbol"[^>]*required/);

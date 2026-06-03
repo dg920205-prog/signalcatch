@@ -7,6 +7,7 @@ import { groupSummaries, summarizeTrades } from "./backtest/metrics.js";
 import { buildModeJobs, partitionOosTrades, presetDateWindow, selectBybitSymbols } from "./backtest/workflow.js";
 import { MODE_CONFIG } from "./config.js";
 import { createManualAssetService } from "./services/manual-assets.js";
+import { createManualSearchService } from "./services/manual-search.js";
 import { createMarketService } from "./services/market.js";
 import { createScannerService } from "./services/scanner.js";
 import { createScannerSearchService } from "./services/scanner-search.js";
@@ -22,6 +23,7 @@ const elements = {
   lastRefresh: document.querySelector("#last-refresh"),
   summaryGrid: document.querySelector("#summary-grid"),
   manualForm: document.querySelector("#manual-form"),
+  manualSearchResult: document.querySelector("#manual-search-result"),
   manualGrid: document.querySelector("#manual-grid"),
   recommendationMode: document.querySelector("#recommendation-mode"),
   dialog: document.querySelector("#settings-dialog"),
@@ -64,6 +66,10 @@ const adapters = {
   },
 };
 const manualService = createManualAssetService(adapters);
+const manualSearchService = createManualSearchService({
+  searchSymbols: searchBybitSymbols,
+  addAsset: ({ symbol, exchange }) => manualService.add({ symbol, exchange }),
+});
 const scannerService = createScannerService({
   bybit: {
     fetchTicker: fetchBybitTicker,
@@ -82,6 +88,7 @@ const marketService = createMarketService({
 let lastTrades = [];
 let lastScannerCandidates = [];
 let selectedMarketSymbol = null;
+let pendingManualSearch = null;
 const scannerSearchService = createScannerSearchService({
   searchSymbols: searchBybitSymbols,
   scanSymbols: (symbols) => scannerService.run({ symbols }),
@@ -128,13 +135,14 @@ function rerender() {
 }
 
 async function addManualAsset(form) {
-  const formData = new FormData(form);
-  const symbol = String(formData.get("symbol") ?? "");
-  const exchange = String(formData.get("exchange") ?? "bybit");
+  const searchResult = pendingManualSearch;
+  if (!searchResult) return;
   setApiStatus(elements.apiStatus, "loading", { dom });
   try {
-    const asset = await manualService.add({ symbol, exchange });
+    const asset = await manualSearchService.confirm(searchResult);
     marketProfileById.set(asset.id, await marketProfileLoader.load(asset.symbol));
+    pendingManualSearch = null;
+    dom.clear(elements.manualSearchResult);
     setApiStatus(elements.apiStatus, "ready", { dom });
     rerender();
   } catch {
@@ -306,6 +314,32 @@ async function runScannerSearch(form) {
   }
 }
 
+async function verifyManualAsset(form) {
+  const formData = new FormData(form);
+  const symbol = String(formData.get("symbol") ?? "");
+  const exchange = String(formData.get("exchange") ?? "bybit");
+  dom.setText(elements.manualSearchResult, "종목을 확인하고 있습니다.");
+  pendingManualSearch = null;
+  try {
+    const result = await manualSearchService.verify({ symbol, exchange });
+    if (result.kind === "unsupported") {
+      dom.setText(elements.manualSearchResult, `${result.symbol}: Bybit 미지원 종목`);
+      return;
+    }
+    pendingManualSearch = result;
+    dom.clear(elements.manualSearchResult);
+    dom.append(
+      elements.manualSearchResult,
+      dom.el("div", { class: "verified-result" },
+        dom.el("strong", {}, `${result.symbol} / ${result.exchange.toUpperCase()}`),
+        dom.el("button", { type: "button", onClick: () => addManualAsset(form) }, "분석 추가"),
+      ),
+    );
+  } catch {
+    dom.setText(elements.manualSearchResult, "종목 확인 중 API 오류가 발생했습니다.");
+  }
+}
+
 function bindDialog() {
   elements.openSettings.addEventListener("click", () => elements.dialog.showModal());
   elements.closeSettings.addEventListener("click", () => elements.dialog.close());
@@ -331,8 +365,7 @@ function bindBacktestPresets() {
 function bindManualForm() {
   elements.manualForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    await addManualAsset(elements.manualForm);
-    elements.manualForm.reset();
+    await verifyManualAsset(elements.manualForm);
   });
 }
 

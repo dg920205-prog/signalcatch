@@ -42,8 +42,9 @@
         <form id="manual-form" class="inline-form">
           <label>Symbol<input name="symbol" placeholder="HBAR" required></label>
           <label>Exchange<select name="exchange"><option value="bybit">Bybit</option><option value="binance">Binance</option></select></label>
-          <button type="submit">Add asset</button>
+          <button type="submit">종목 확인</button>
         </form>
+        <div id="manual-search-result" class="manual-search-result" role="status"></div>
         <div id="manual-grid" class="asset-grid"><p class="empty-state">Add a symbol to begin monitoring.</p></div>
       </section>
       <section id="scanner-panel" class="panel" role="tabpanel" aria-labelledby="scanner-tab" data-panel="scanner" hidden>
