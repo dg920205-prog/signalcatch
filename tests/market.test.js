@@ -198,3 +198,25 @@ test("market service caps concurrent heatmap candle requests", async () => {
   await pending;
   assert.equal(maximum, 2);
 });
+
+test("market service loads lightweight dashboard context without theme candles", async () => {
+  const requests = [];
+  const service = createMarketService({
+    bybit: {
+      fetchMarketTickers: async () => [
+        { symbol: "BTC", price: 100, turnover24h: 1000, change24hPct: 1 },
+        { symbol: "ETH", price: 100, turnover24h: 900, change24hPct: 1 },
+        { symbol: "SOL", price: 50, turnover24h: 500, change24hPct: 2 },
+      ],
+      fetchCandles: async (symbol, options) => {
+        requests.push([symbol, options.interval]);
+        return candles();
+      },
+    },
+    themes: { Major: ["BTC", "ETH", "SOL"] },
+  });
+
+  const context = await service.loadDashboardContext();
+  assert.equal(context.cards.length, 8);
+  assert.deepEqual(requests, [["BTC", "240"], ["ETH", "240"]]);
+});

@@ -8,6 +8,7 @@ import {
   selectStrongestSetup,
   THEMES,
 } from "../analysis/market-heatmap.js";
+import { buildDashboardContext } from "../analysis/dashboard-context.js";
 import { buildRecommendation } from "../analysis/recommendation.js";
 import { analyzeCandles, classifyModes } from "../analysis/signals.js";
 import { MODE_CONFIG } from "../config.js";
@@ -113,5 +114,21 @@ export function createMarketService({ bybit, themes = THEMES, concurrency = 4 } 
     };
   }
 
-  return { loadDetail, refresh };
+  async function loadDashboardContext() {
+    const [tickers, btcCandles, ethCandles] = await Promise.all([
+      bybit.fetchMarketTickers(),
+      bybit.fetchCandles("BTC", { interval: "240", limit: 120 }),
+      bybit.fetchCandles("ETH", { interval: "240", limit: 120 }),
+    ]);
+    const altTiles = tickers
+      .filter((ticker) => ticker?.symbol !== "BTC" && ticker?.symbol !== "ETH")
+      .map((ticker) => ({
+        ...ticker,
+        status: "ready",
+        ...calculateSymbolStrength({ change24hPct: ticker.change24hPct }),
+      }));
+    return buildDashboardContext({ btcCandles, ethCandles, altTiles });
+  }
+
+  return { loadDashboardContext, loadDetail, refresh };
 }
