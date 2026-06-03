@@ -69,20 +69,34 @@ function renderSatoshiLeaders(leaders, dom) {
   );
 }
 
+function renderReferenceChips(indicators, dom) {
+  const items = Array.isArray(indicators) ? indicators : [];
+  return dom.el("div", { class: "reference-chip-list" },
+    dom.el("strong", {}, "참고 지표"),
+    items.map((indicator) => dom.el("span", { class: "reference-chip" }, safeRead({ indicator }, "indicator", ""))),
+  );
+}
+
 export function renderDashboardContext(container, context = {}, { dom, onSelect } = {}) {
   dom.clear(container);
   const cards = Array.isArray(context?.cards) ? context.cards : [];
+  const automatedCards = cards.filter((card) => safeRead(card, "source") !== "reference").slice(0, 3);
   dom.append(container,
-    dom.el("div", { class: "context-banner" },
-      dom.el("div", {},
-        dom.el("p", { class: "eyebrow" }, "MARKET DIRECTION"),
-        dom.el("h2", {}, safeRead(context, "label", "시장 방향성 대기")),
+    dom.el("div", { class: "context-intelligence-grid" },
+      dom.el("div", { class: "context-banner" },
+        dom.el("div", {},
+          dom.el("p", { class: "eyebrow" }, "MARKET INTELLIGENCE"),
+          dom.el("h2", {}, safeRead(context, "label", "시장 방향성 대기")),
+        ),
+        dom.el("p", { class: "muted" }, `자동 반영: ${(safeRead(context, "automatedInputs", [])).join(", ")}`),
+        dom.el("p", { class: "muted" }, `점수 기준: ${safeRead(context, "scoreNote", "4H trend + relative strength + breadth")}`),
+        renderReferenceChips(safeRead(context, "referenceIndicators", []), dom),
       ),
-      dom.el("p", { class: "muted" }, `자동 반영: ${(safeRead(context, "automatedInputs", [])).join(", ")}`),
-      dom.el("p", { class: "muted" }, `점수 기준: ${safeRead(context, "scoreNote", "4H trend + relative strength + breadth")}`),
-      dom.el("p", { class: "muted" }, `참고 지표: ${(safeRead(context, "referenceIndicators", [])).join(", ")}`),
+      renderSatoshiLeaders(safeRead(context, "satoshiLeaders", []), dom),
     ),
-    dom.el("div", { class: "market-context-grid" }, cards.map((card) => renderCard(card, dom, onSelect))),
-    renderSatoshiLeaders(safeRead(context, "satoshiLeaders", []), dom),
+    dom.el("details", { class: "market-context-details" },
+      dom.el("summary", {}, "핵심 시장 입력 보기"),
+      dom.el("div", { class: "market-context-grid" }, automatedCards.map((card) => renderCard(card, dom, onSelect))),
+    ),
   );
 }

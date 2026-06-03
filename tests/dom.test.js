@@ -384,6 +384,74 @@ test("recommendation badge maps every visible quality label", () => {
   assert.equal(recommendationBadge("비추천"), "⛔ 비추천");
 });
 
+test("scanner results group candidates by recommendation quality", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const candidate = (symbol, label) => ({
+    symbol,
+    price: 1,
+    status: "ready",
+    setups: {
+      common: {
+        mode: "common",
+        direction: "bull",
+        plan: { entryLow: 1, entryHigh: 1.1, sl: 0.9, tp: 1.3 },
+        recommendation: { label },
+      },
+    },
+  });
+
+  renderScannerResults(container, [
+    candidate("WATCH", "주의"),
+    candidate("GO", "추천"),
+    candidate("PASS", "비추천"),
+  ], { dom });
+
+  const text = flattenText(container);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "scanner-filter-bar").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "scanner-result-group group-recommended").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "scanner-result-group group-watch").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "scanner-result-group group-avoid").length, 1);
+  assert.equal(text.indexOf("GO") < text.indexOf("WATCH"), true);
+  assert.equal(text.indexOf("WATCH") < text.indexOf("PASS"), true);
+});
+
+test("scanner recommendation filters hide unmatched groups", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const candidate = (symbol, label) => ({
+    symbol,
+    price: 1,
+    setups: {
+      common: {
+        mode: "common",
+        direction: "bull",
+        plan: { entryLow: 1, entryHigh: 1.1, sl: 0.9, tp: 1.3 },
+        recommendation: { label },
+      },
+    },
+  });
+
+  renderScannerResults(container, [
+    candidate("GO", "추천"),
+    candidate("WATCH", "주의"),
+    candidate("PASS", "비추천"),
+  ], { dom });
+
+  const watchButton = findNodes(container, (node) =>
+    node.attributes.class === "scanner-filter-pill group-watch" && node.tagName === "button",
+  )[0];
+  assert.ok(watchButton);
+  watchButton.listeners.click();
+
+  const recommendedGroup = findNodes(container, (node) => node.attributes.class === "scanner-result-group group-recommended")[0];
+  const watchGroup = findNodes(container, (node) => node.attributes.class === "scanner-result-group group-watch")[0];
+  const avoidGroup = findNodes(container, (node) => node.attributes.class === "scanner-result-group group-avoid")[0];
+  assert.equal(recommendedGroup.hidden, true);
+  assert.equal(watchGroup.hidden, false);
+  assert.equal(avoidGroup.hidden, true);
+});
+
 test("scanner results render expandable current setups for every timeframe", () => {
   const dom = createDom(createFakeDocument());
   const container = new FakeNode("section");
@@ -483,6 +551,42 @@ test("formats prices with grouping and at most four decimal places", () => {
   assert.equal(formatPrice(69568.41129), "69,568.4113");
   assert.equal(formatPrice(0.629234), "0.6292");
   assert.equal(formatPrice(70024), "70,024");
+});
+
+test("scanner setup cards explain entry stop and target criteria", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+
+  renderScannerResults(
+    container,
+    [{
+      symbol: "LINK",
+      price: 10,
+      setups: {
+        daily: {
+          mode: "daily",
+          direction: "bull",
+          analysis: {
+            atr: 2,
+            confidence: 74,
+            volumeRatio: 1.5,
+            trendStrength: 0.032,
+            reasons: ["단기 평균이 장기 평균보다 높습니다.", "최근 거래량이 이전 평균보다 높습니다."],
+          },
+          plan: { entryLow: 9, entryHigh: 10, sl: 8, tp: 13 },
+          recommendation: { label: "추천" },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "setup-explain").length >= 1, true);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "setup-reasons").length >= 1, true);
+  assert.match(text, /ATR/);
+  assert.match(text, /confidence|신뢰도/);
+  assert.match(text, /단기 평균/);
 });
 
 test("scanner split guidance separates entry stop loss and take profit blocks", () => {
@@ -594,7 +698,7 @@ test("TradingView reference URL allowlists dashboard symbols", () => {
   assert.throws(() => tradingViewReferenceUrl("javascript:alert(1)"), /unsupported/i);
 });
 
-test("dashboard context renders eight cards and score boundary labels", () => {
+test("dashboard context renders compact intelligence instead of large reference cards", () => {
   const dom = createDom(createFakeDocument());
   const container = new FakeNode("section");
   renderDashboardContext(container, {
@@ -616,8 +720,10 @@ test("dashboard context renders eight cards and score boundary labels", () => {
   }, { dom });
   const text = flattenText(container);
   assert.match(text, /자동 반영/);
-  assert.match(text, /시각 참고/);
-  assert.equal(findNodes(container, (node) => node.attributes.class === "market-context-card").length, 8);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "market-context-card").length, 3);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "reference-chip-list").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "context-intelligence-grid").length, 1);
+  assert.equal(text.includes("BTC.D"), true);
 });
 
 test("dashboard context renders own visualization without embedded reference iframes", () => {
