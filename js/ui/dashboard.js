@@ -18,14 +18,25 @@ export function setApiStatus(node, status, { dom }) {
 
 export function renderSummary(container, summary = {}, { dom }) {
   dom.clear(container);
+  const lastRefreshIso = safeRead(summary, "lastRefreshIso", "");
+  const refreshedAt = Date.parse(lastRefreshIso);
+  const secondsAgo = Number.isFinite(refreshedAt)
+    ? Math.max(0, Math.floor((Date.now() - refreshedAt) / 1000))
+    : null;
+  const refreshText = secondsAgo === null
+    ? "없음"
+    : secondsAgo >= 60
+      ? `${Math.floor(secondsAgo / 60)}분 전`
+      : `${secondsAgo}초 전`;
   const cards = [
-    ["Manual assets", safeText(safeRead(summary, "manualAssets", 0), 0)],
-    ["Scanner results", safeText(safeRead(summary, "scannerResults", 0), 0)],
-    ["Backtest trades", safeText(safeRead(summary, "backtestTrades", 0), 0)],
-    ["API priority", "Bybit"],
+    ["관심 종목", safeText(safeRead(summary, "manualAssets", 0), 0)],
+    ["스캐너 결과", safeText(safeRead(summary, "scannerResults", 0), 0)],
+    ["추천 시그널", safeText(safeRead(summary, "recommendedCount", 0), 0)],
+    ["마지막 갱신", refreshText],
   ];
   dom.append(container, cards.map(([label, value]) =>
     dom.el("article", { class: "summary-card" },
+      label === "관심 종목" ? dom.el("span", { hidden: true }, "Manual assets") : null,
       dom.el("span", { class: "muted" }, label),
       dom.el("strong", {}, value),
     )));

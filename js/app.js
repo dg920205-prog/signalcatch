@@ -92,6 +92,7 @@ let lastTrades = [];
 let lastScannerCandidates = [];
 let selectedMarketSymbol = null;
 let pendingManualSearch = null;
+let lastRefreshIso = "";
 const scannerSearchService = createScannerSearchService({
   searchSymbols: searchBybitSymbols,
   scanSymbols: (symbols) => scannerService.run({ symbols }),
@@ -102,13 +103,17 @@ function nowIso() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
 
-function updateSummary(assets = [], tradeCount = 0) {
+function updateSummary(assets = []) {
+  const recommendedCount = assets.filter((asset) =>
+    asset?.recommendation?.quality === "recommended",
+  ).length;
   renderSummary(
     elements.summaryGrid,
     {
       manualAssets: assets.length,
       scannerResults: lastScannerCandidates.length,
-      backtestTrades: tradeCount,
+      recommendedCount,
+      lastRefreshIso,
     },
     { dom },
   );
@@ -132,8 +137,9 @@ function enrichAssets(rawAssets) {
 
 function rerender() {
   const assets = enrichAssets(manualService.list());
+  lastRefreshIso = new Date().toISOString();
   renderManualAssets(elements.manualGrid, assets, { dom });
-  updateSummary(assets, lastTrades.length);
+  updateSummary(assets);
   dom.setText(elements.lastRefresh, nowIso());
 }
 
