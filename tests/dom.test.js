@@ -18,6 +18,8 @@ import { renderManualAssetCard, renderManualAssets } from "../js/ui/manual-asset
 import { renderMarketChart, renderMarketDetail, renderMarketHeatmap } from "../js/ui/market.js";
 import { recommendationBadge } from "../js/ui/recommendation-badge.js";
 import { renderScannerResults } from "../js/ui/scanner.js";
+import { renderDashboardContext } from "../js/ui/dashboard-context.js";
+import { tradingViewReferenceUrl } from "../js/ui/tradingview.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
 
 const INVALID_BACKTEST_SETTINGS = /잘못된 백테스트 설정입니다\./;
@@ -139,6 +141,14 @@ test("el applies only allowlisted attributes and registers events with addEventL
     class: "button",
   });
   assert.equal(node.listeners.click, click);
+
+  const frame = dom.el("iframe", {
+    src: "https://s.tradingview.com/widgetembed/?symbol=CRYPTOCAP%3ABTC.D",
+    loading: "lazy",
+    referrerpolicy: "no-referrer-when-downgrade",
+  });
+  assert.equal(frame.attributes.src, "https://s.tradingview.com/widgetembed/?symbol=CRYPTOCAP%3ABTC.D");
+  assert.equal(frame.attributes.loading, "lazy");
 });
 
 test("index declares strict CSP and external stylesheet and module script", async () => {
@@ -146,9 +156,10 @@ test("index declares strict CSP and external stylesheet and module script", asyn
 
   assert.ok(
     html.includes(
-      "default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com https://api.coingecko.com; object-src 'none'; base-uri 'none'; form-action 'none'",
+      "default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com https://api.coingecko.com; frame-src https://s.tradingview.com https://www.tradingview.com; object-src 'none'; base-uri 'none'; form-action 'none'",
     ),
   );
+  assert.match(html, /frame-src https:\/\/s\.tradingview\.com https:\/\/www\.tradingview\.com/);
   assert.match(html, /<link rel="stylesheet" href="css\/styles\.css">/);
   assert.match(html, /<script type="module" src="js\/app\.js"><\/script>/);
   assert.doesNotMatch(html, /\son[a-z]+=/i);
@@ -505,6 +516,37 @@ test("market heatmap shows top five tiles and collapses remaining assets", () =>
   const visibleGrid = findNodes(container, (node) => node.attributes.class === "heatmap-grid")[0];
   assert.equal(findNodes(visibleGrid, (node) => node.attributes.class?.includes("heatmap-tile")).length, 5);
   assert.equal(flattenText(container).includes("전체 종목 보기"), true);
+});
+
+test("TradingView reference URL allowlists dashboard symbols", () => {
+  assert.match(tradingViewReferenceUrl("BTC.D", { compact: true }), /CRYPTOCAP%3ABTC\.D/);
+  assert.throws(() => tradingViewReferenceUrl("javascript:alert(1)"), /unsupported/i);
+});
+
+test("dashboard context renders eight cards and score boundary labels", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderDashboardContext(container, {
+    label: "⚠️ 혼조 · 중립 우세",
+    score: 4,
+    automatedInputs: ["BTC", "ETH", "BTC/ETH", "Bybit 알트 시장 폭"],
+    referenceIndicators: ["BTC.D", "USDT.D", "OTHERS.D", "OTHERS", "TOTAL3ES"],
+    cards: [
+      { symbol: "BTC", source: "automated", direction: "▲ 상승", interpretation: "BTC 자동 분석", series: [1, 2, 3] },
+      { symbol: "ETH", source: "automated", direction: "● 중립", interpretation: "ETH 자동 분석", series: [1, 1, 1] },
+      { symbol: "BTC/ETH", source: "automated", direction: "▲ 상승", interpretation: "상대 강세", series: [] },
+      ...["BTC.D", "USDT.D", "OTHERS.D", "OTHERS", "TOTAL3ES"].map((symbol) => ({
+        symbol,
+        source: "reference",
+        direction: "TradingView 참고",
+        interpretation: "시각 참고",
+      })),
+    ],
+  }, { dom });
+  const text = flattenText(container);
+  assert.match(text, /자동 반영/);
+  assert.match(text, /시각 참고/);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "market-context-card").length, 8);
 });
 
 test("market detail renders timeframe controls chart briefing and strongest setup", () => {

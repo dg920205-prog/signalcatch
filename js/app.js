@@ -15,13 +15,16 @@ import { buildBacktestRequest, downloadBacktestCsv, renderBacktestMetrics, rende
 import { activateTab, bindTabs, renderSummary, setApiStatus } from "./ui/dashboard.js";
 import { dom } from "./ui/dom.js";
 import { renderManualAssets } from "./ui/manual-assets.js";
+import { renderDashboardContext } from "./ui/dashboard-context.js";
 import { renderMarketDetail, renderMarketHeatmap } from "./ui/market.js";
+import { tradingViewReferenceUrl } from "./ui/tradingview.js";
 import { renderScannerProgress, renderScannerResults } from "./ui/scanner.js";
 
 const elements = {
   apiStatus: document.querySelector("#api-status"),
   lastRefresh: document.querySelector("#last-refresh"),
   summaryGrid: document.querySelector("#summary-grid"),
+  dashboardContext: document.querySelector("#dashboard-context"),
   manualForm: document.querySelector("#manual-form"),
   manualSearchResult: document.querySelector("#manual-search-result"),
   manualGrid: document.querySelector("#manual-grid"),
@@ -407,6 +410,21 @@ async function refreshMarket() {
   }
 }
 
+async function loadDashboardContext() {
+  try {
+    const context = await marketService.loadDashboardContext();
+    renderDashboardContext(elements.dashboardContext, context, {
+      dom,
+      onSelect: (symbol) => {
+        const frame = elements.dashboardContext.querySelector?.(".context-reference-chart iframe");
+        if (frame) frame.setAttribute("src", tradingViewReferenceUrl(symbol));
+      },
+    });
+  } catch {
+    dom.setText(elements.dashboardContext, "시장 방향성을 불러오지 못했습니다.");
+  }
+}
+
 async function loadMarketDetail(symbol, timeframe = "4H") {
   selectedMarketSymbol = symbol;
   setApiStatus(elements.apiStatus, "loading", { dom });
@@ -436,3 +454,4 @@ bindScanner();
 bindMarket();
 setApiStatus(elements.apiStatus, "idle", { dom });
 rerender();
+loadDashboardContext();

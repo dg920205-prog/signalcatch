@@ -4,8 +4,17 @@ const SAFE_ATTRIBUTES = new Set([
   "checked", "selected", "download", "viewBox", "points", "colspan",
 ]);
 
+const SAFE_IFRAME_ATTRIBUTES = new Set(["src", "loading", "referrerpolicy", "allowfullscreen"]);
+
 function isSafeAttribute(name) {
   return SAFE_ATTRIBUTES.has(name) || name.startsWith("aria-") || name.startsWith("data-");
+}
+
+function isSafeIframeAttribute(node, name, value) {
+  if (String(node.tagName).toLowerCase() !== "iframe" || !SAFE_IFRAME_ATTRIBUTES.has(name)) {
+    return false;
+  }
+  return name !== "src" || String(value).startsWith("https://s.tradingview.com/");
 }
 
 export function safeText(value, fallback = "") {
@@ -88,7 +97,12 @@ export function createDom(documentRef = globalThis.document) {
     for (const [name, value] of Object.entries(attributes ?? {})) {
       if (/^on[A-Z]/.test(name) && typeof value === "function") {
         node.addEventListener(name.slice(2).toLowerCase(), value);
-      } else if (isSafeAttribute(name) && value !== false && value !== undefined && value !== null) {
+      } else if (
+        (isSafeAttribute(name) || isSafeIframeAttribute(node, name, value)) &&
+        value !== false &&
+        value !== undefined &&
+        value !== null
+      ) {
         node.setAttribute(name, value === true ? "" : String(value));
       }
     }

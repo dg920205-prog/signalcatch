@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com https://api.coingecko.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.bybit.com https://fapi.binance.com https://api.coingecko.com; frame-src https://s.tradingview.com https://www.tradingview.com; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>SignalCatch Dashboard</title>
     <link rel="stylesheet" href="css/styles.css">
   </head>
@@ -22,6 +22,9 @@
     </header>
     <main class="dashboard-shell">
       <section id="summary-grid" class="summary-grid" aria-label="Dashboard summary"></section>
+      <section id="dashboard-context" class="market-context-panel" aria-label="시장 통합 방향성">
+        <p class="empty-state">시장 문맥을 새로고침하면 통합 방향성이 표시됩니다.</p>
+      </section>
       <details class="usage-guide">
         <summary>How to use SignalCatch</summary>
         <ol>

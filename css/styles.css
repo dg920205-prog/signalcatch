@@ -44,6 +44,17 @@ h2 { margin-bottom: .25rem; }
 .usage-guide { margin: 1rem 0; border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem; background: var(--navy-900); }
 .usage-guide summary, .scanner-setups summary { color: var(--cyan); cursor: pointer; font-weight: 800; }
 .usage-guide ol { margin-bottom: 0; padding-left: 1.25rem; color: var(--slate); }
+.market-context-panel { margin: 1rem 0; border: 1px solid var(--line); border-radius: 10px; padding: 1rem; background: linear-gradient(150deg, var(--navy-900), #0a1c34); }
+.context-banner { display: grid; gap: .25rem; margin-bottom: .8rem; }
+.market-context-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; }
+.market-context-card { display: grid; gap: .35rem; min-height: 150px; border-color: var(--line); text-align: left; background: #0e2948; }
+.context-card-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.source-badge { border: 1px solid var(--line); border-radius: 999px; padding: .12rem .4rem; color: var(--slate); font-size: .7rem; }
+.context-mini-chart, .context-mini-frame { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 6px; background: #071426; }
+.context-mini-frame { display: block; }
+.context-direction { color: var(--cyan); font-weight: 800; }
+.context-reference-chart { margin-top: .8rem; height: 260px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--navy-950); }
+.context-reference-chart iframe { width: 100%; height: 100%; border: 0; }
 .section-heading { justify-content: space-between; }
 .section-heading label { min-width: 180px; }
 .inline-form { margin-bottom: 1rem; }
@@ -112,6 +123,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .7); }
 @media (max-width: 760px) {
   .app-header { align-items: flex-start; flex-direction: column; }
   .summary-grid, .asset-grid, .metrics-grid, .backtest-form, .split-grid { grid-template-columns: 1fr; }
+  .market-context-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .setup-table, .setup-table tbody, .setup-table tr, .setup-table td { display: block; width: 100%; }
   .setup-table thead { display: none; }
