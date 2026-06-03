@@ -1,5 +1,3 @@
-import { tradingViewReferenceUrl } from "./tradingview.js";
-
 function safeRead(value, key, fallback) {
   try {
     return value?.[key] ?? fallback;
@@ -22,17 +20,15 @@ function points(values) {
 }
 
 function renderMiniChart(card, dom) {
-  if (safeRead(card, "source") === "reference") {
-    return dom.el("iframe", {
-      class: "context-mini-frame",
-      src: tradingViewReferenceUrl(safeRead(card, "symbol"), { compact: true }),
-      loading: "lazy",
-      referrerpolicy: "no-referrer-when-downgrade",
-      title: `${safeRead(card, "symbol")} TradingView reference`,
-    });
-  }
   return dom.svgEl("svg", { class: "context-mini-chart", viewBox: "0 0 100 40", "aria-label": `${safeRead(card, "symbol")} mini chart` },
     dom.svgEl("polyline", { points: points(safeRead(card, "series", [])) }),
+  );
+}
+
+function renderStrengthMeter(value, dom) {
+  const score = typeof value === "number" && Number.isFinite(value) ? Math.max(-100, Math.min(100, value)) : 0;
+  return dom.el("div", { class: `context-meter ${score >= 0 ? "is-positive" : "is-negative"}` },
+    dom.el("span", {}, `${score.toFixed(1)}`),
   );
 }
 
@@ -48,8 +44,28 @@ function renderCard(card, dom, onSelect) {
       dom.el("span", { class: "source-badge" }, source),
     ),
     renderMiniChart(card, dom),
+    renderStrengthMeter(safeRead(card, "score", 0), dom),
     dom.el("span", { class: "context-direction" }, safeRead(card, "direction", "● 중립")),
     dom.el("span", { class: "muted" }, safeRead(card, "interpretation", "")),
+  );
+}
+
+function renderSatoshiLeaders(leaders, dom) {
+  const rows = Array.isArray(leaders) ? leaders : [];
+  return dom.el("section", { class: "satoshi-leaders" },
+    dom.el("div", { class: "section-heading" },
+      dom.el("h3", {}, "BTC 대비 강세 TOP"),
+      dom.el("span", { class: "muted" }, "USDT 변화율을 BTC 흐름과 비교한 가벼운 상대강도"),
+    ),
+    rows.length
+      ? dom.el("div", { class: "satoshi-leader-list" }, rows.map((leader) =>
+          dom.el("div", { class: `satoshi-leader strength-${String(safeRead(leader, "label", "Neutral")).toLowerCase()}` },
+            dom.el("strong", {}, safeRead(leader, "symbol", "UNKNOWN/BTC")),
+            dom.el("span", {}, safeRead(leader, "label", "Neutral")),
+            dom.el("span", {}, `${Number(safeRead(leader, "score", 0)).toFixed(1)}`),
+          ),
+        ))
+      : dom.el("p", { class: "empty-state" }, "BTC 대비 강세 후보가 아직 없습니다."),
   );
 }
 
@@ -63,16 +79,10 @@ export function renderDashboardContext(container, context = {}, { dom, onSelect 
         dom.el("h2", {}, safeRead(context, "label", "시장 방향성 대기")),
       ),
       dom.el("p", { class: "muted" }, `자동 반영: ${(safeRead(context, "automatedInputs", [])).join(", ")}`),
-      dom.el("p", { class: "muted" }, `시각 참고: ${(safeRead(context, "referenceIndicators", [])).join(", ")}`),
+      dom.el("p", { class: "muted" }, `점수 기준: ${safeRead(context, "scoreNote", "4H trend + relative strength + breadth")}`),
+      dom.el("p", { class: "muted" }, `참고 지표: ${(safeRead(context, "referenceIndicators", [])).join(", ")}`),
     ),
     dom.el("div", { class: "market-context-grid" }, cards.map((card) => renderCard(card, dom, onSelect))),
-    dom.el("div", { class: "context-reference-chart" },
-      dom.el("iframe", {
-        src: tradingViewReferenceUrl(safeRead(cards[0], "symbol", "BTC")),
-        loading: "lazy",
-        referrerpolicy: "no-referrer-when-downgrade",
-        title: "Selected TradingView reference chart",
-      }),
-    ),
+    renderSatoshiLeaders(safeRead(context, "satoshiLeaders", []), dom),
   );
 }

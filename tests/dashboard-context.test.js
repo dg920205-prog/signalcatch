@@ -37,6 +37,22 @@ test("dashboard context labels aligned rising markets as bullish", () => {
   assert.match(context.label, /상승/);
 });
 
+test("dashboard context ranks BTC relative strength leaders", () => {
+  const context = buildDashboardContext({
+    btcCandles: trendCandles(100, 1),
+    ethCandles: trendCandles(200, 1),
+    altTiles: [
+      { symbol: "LINK", status: "ready", score: 42, change24hPct: 18 },
+      { symbol: "SOL", status: "ready", score: 20, change24hPct: 10 },
+      { symbol: "XRP", status: "ready", score: -10, change24hPct: -4 },
+    ],
+  });
+
+  assert.deepEqual(context.satoshiLeaders.map(({ symbol }) => symbol), ["LINK/BTC", "SOL/BTC", "XRP/BTC"]);
+  assert.equal(context.satoshiLeaders[0].score > context.satoshiLeaders[1].score, true);
+  assert.match(context.scoreNote, /4H|relative|breadth/i);
+});
+
 test("dashboard context labels mixed conditions as neutral", () => {
   const context = buildDashboardContext({
     btcCandles: trendCandles(100, 2),

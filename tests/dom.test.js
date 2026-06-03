@@ -423,7 +423,7 @@ test("scanner results render expandable current setups for every timeframe", () 
   const text = flattenText(container);
   assert.equal(text.includes("현재가"), true);
   assert.equal(text.includes("0.18"), true);
-  assert.equal(text.includes("진입 구간"), true);
+  assert.equal(text.includes("진입"), true);
   assert.equal(text.includes("98 ~ 100"), true);
   assert.equal(text.includes("SL"), true);
   assert.equal(text.includes("96"), true);
@@ -432,6 +432,51 @@ test("scanner results render expandable current setups for every timeframe", () 
   assert.equal(text.includes("daily"), true);
   assert.equal(text.includes("분할 진입 E1 100 (25%)"), true);
   assert.equal(text.includes("분할 TP TP1 104 (40%)"), true);
+});
+
+test("scanner setup details render as vertical setup cards", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  const plan = { entryLow: 98, entryHigh: 100, sl: 96, tp: 106 };
+
+  renderScannerResults(
+    container,
+    [{
+      symbol: "HBAR",
+      exchange: "Bybit",
+      status: "ready",
+      price: 0.18,
+      modeResults: {},
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan,
+          recommendation: { label: "異붿쿇" },
+        },
+        daily: {
+          mode: "daily",
+          direction: "bull",
+          plan,
+          recommendation: {
+            label: "異붿쿇",
+            split: {
+              entries: [{ label: "E1", price: 98, weightPct: 25 }],
+              targets: [{ label: "TP1", price: 106, weightPct: 50 }],
+            },
+          },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  assert.equal(findNodes(container, (node) => node.attributes.class === "setup-table").length, 0);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "setup-card-list").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class?.includes("setup-detail-card")).length, 5);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "setup-stat setup-entry").length >= 1, true);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "setup-stat setup-sl").length >= 1, true);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "setup-stat setup-tp").length >= 1, true);
 });
 
 test("formats prices with grouping and at most four decimal places", () => {
@@ -486,7 +531,7 @@ test("market heatmap renders theme scores and selectable asset tiles", () => {
   const text = flattenText(container);
   assert.equal(text.includes("Major"), true);
   assert.equal(text.includes("Strong"), true);
-  const [tile] = findNodes(container, (node) => node.tagName === "button" && node.attributes.class === "heatmap-tile strength-strong");
+  const [tile] = findNodes(container, (node) => node.tagName === "button" && node.attributes.class === "heatmap-row strength-strong");
   assert.ok(tile);
   tile.listeners.click();
   assert.deepEqual(selected, ["BTC"]);
@@ -513,9 +558,35 @@ test("market heatmap shows top five tiles and collapses remaining assets", () =>
     { dom },
   );
 
-  const visibleGrid = findNodes(container, (node) => node.attributes.class === "heatmap-grid")[0];
-  assert.equal(findNodes(visibleGrid, (node) => node.attributes.class?.includes("heatmap-tile")).length, 5);
+  const visibleList = findNodes(container, (node) => node.attributes.class === "heatmap-list")[0];
+  assert.equal(findNodes(visibleList, (node) => node.attributes.class?.includes("heatmap-row")).length, 5);
   assert.equal(flattenText(container).includes("전체 종목 보기"), true);
+});
+
+test("market heatmap renders compact vertical theme lists", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderMarketHeatmap(
+    container,
+    {
+      L1: {
+        theme: "L1",
+        score: 12,
+        label: "Neutral",
+        tiles: ["A", "B", "C"].map((symbol, index) => ({
+          symbol,
+          score: 50 - index,
+          label: index === 0 ? "Strong" : "Neutral",
+          status: "ready",
+        })),
+      },
+    },
+    { dom },
+  );
+
+  assert.equal(findNodes(container, (node) => node.attributes.class === "heatmap-grid").length, 0);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "heatmap-list").length, 1);
+  assert.equal(findNodes(container, (node) => node.attributes.class?.includes("heatmap-row")).length, 3);
 });
 
 test("TradingView reference URL allowlists dashboard symbols", () => {
@@ -547,6 +618,33 @@ test("dashboard context renders eight cards and score boundary labels", () => {
   assert.match(text, /자동 반영/);
   assert.match(text, /시각 참고/);
   assert.equal(findNodes(container, (node) => node.attributes.class === "market-context-card").length, 8);
+});
+
+test("dashboard context renders own visualization without embedded reference iframes", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderDashboardContext(container, {
+    label: "Neutral",
+    score: 4,
+    scoreNote: "4H trend plus relative strength",
+    automatedInputs: ["BTC", "ETH", "BTC/ETH", "Bybit breadth"],
+    referenceIndicators: [],
+    satoshiLeaders: [
+      { symbol: "LINK/BTC", score: 12.5, label: "Strong", changePct: 18, btcChangePct: 5 },
+      { symbol: "SOL/BTC", score: 8.1, label: "Neutral", changePct: 10, btcChangePct: 2 },
+    ],
+    cards: [
+      { symbol: "BTC", source: "automated", direction: "bear", interpretation: "BTC", series: [3, 2, 1] },
+      { symbol: "ETH", source: "automated", direction: "bear", interpretation: "ETH", series: [3, 2, 1] },
+      { symbol: "BTC/ETH", source: "automated", direction: "neutral", interpretation: "Relative", series: [] },
+    ],
+  }, { dom });
+
+  assert.equal(findNodes(container, (node) => node.tagName === "iframe").length, 0);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "context-reference-chart").length, 0);
+  assert.equal(findNodes(container, (node) => node.attributes.class === "satoshi-leader-list").length, 1);
+  assert.match(flattenText(container), /LINK\/BTC/);
+  assert.match(flattenText(container), /4H trend plus relative strength/);
 });
 
 test("market detail renders timeframe controls chart briefing and strongest setup", () => {
@@ -743,7 +841,7 @@ test("renderers replace hostile collections with safe empty output", () => {
 
   const scanner = new FakeNode("section");
   assert.doesNotThrow(() => renderScannerResults(scanner, hostile, { dom }));
-  assert.equal(flattenText(scanner).includes("종목"), true);
+  assert.equal(flattenText(scanner).includes("스캐너"), true);
 
   const trades = new FakeNode("section");
   assert.doesNotThrow(() => renderBacktestResults(trades, hostile, { dom }));

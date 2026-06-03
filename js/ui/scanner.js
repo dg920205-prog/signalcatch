@@ -44,74 +44,68 @@ function renderSplit(split, plan, dom) {
 
 function renderSetupDetails(candidate, dom) {
   const setups = safeRead(candidate, "setups", {});
-  const body = dom.el("tbody");
-  for (const mode of MODES) {
+  const cards = MODES.map((mode) => {
     const setup = safeRead(setups, mode, {});
     const plan = safeRead(setup, "plan", null);
     const recommendation = safeRead(setup, "recommendation", {});
-    dom.append(
-      body,
-      dom.el(
-        "tr",
-        {},
-        dom.el("td", {}, mode),
-        dom.el("td", {}, safeText(safeRead(setup, "direction"), "neutral")),
-        dom.el("td", {}, plan ? `${formatPrice(safeRead(plan, "entryLow"))} ~ ${formatPrice(safeRead(plan, "entryHigh"))}` : "-"),
-        dom.el("td", {}, plan ? formatPrice(safeRead(plan, "sl")) : "-"),
-        dom.el("td", {}, plan ? formatPrice(safeRead(plan, "tp")) : "-"),
-        dom.el("td", {}, recommendationBadge(safeRead(recommendation, "label"))),
-        dom.el("td", {}, renderSplit(safeRead(recommendation, "split", null), plan, dom)),
+    return dom.el("article", { class: `setup-detail-card mode-${mode}` },
+      dom.el("div", { class: "setup-card-head" },
+        dom.el("strong", {}, mode),
+        dom.el("span", { class: "recommendation-badge" }, recommendationBadge(safeRead(recommendation, "label"))),
       ),
+      dom.el("div", { class: "setup-card-meta" },
+        dom.el("span", {}, `방향 ${safeText(safeRead(setup, "direction"), "neutral")}`),
+      ),
+      dom.el("div", { class: "setup-stat-grid" },
+        dom.el("div", { class: "setup-stat setup-entry" },
+          dom.el("span", {}, "진입"),
+          dom.el("strong", {}, plan ? `${formatPrice(safeRead(plan, "entryLow"))} ~ ${formatPrice(safeRead(plan, "entryHigh"))}` : "-"),
+        ),
+        dom.el("div", { class: "setup-stat setup-sl" },
+          dom.el("span", {}, "SL"),
+          dom.el("strong", {}, plan ? formatPrice(safeRead(plan, "sl")) : "-"),
+        ),
+        dom.el("div", { class: "setup-stat setup-tp" },
+          dom.el("span", {}, "TP"),
+          dom.el("strong", {}, plan ? formatPrice(safeRead(plan, "tp")) : "-"),
+        ),
+      ),
+      renderSplit(safeRead(recommendation, "split", null), plan, dom),
     );
-  }
+  });
   return dom.el(
     "details",
     { class: "scanner-setups" },
     dom.el("summary", {}, "현재 셋업 보기"),
     dom.el("p", { class: "muted" }, `현재가 ${formatPrice(safeRead(candidate, "price"))}`),
-    dom.el(
-      "table",
-      { class: "data-table setup-table" },
-      dom.el(
-        "thead",
-        {},
-        dom.el(
-          "tr",
-          {},
-          ...["모드", "방향", "진입 구간", "SL", "TP", "추천", "분할 안내"].map((label) =>
-            dom.el("th", {}, label),
-          ),
-        ),
-      ),
-      body,
-    ),
+    dom.el("div", { class: "setup-card-list" }, cards),
   );
 }
 
 export function renderScannerResults(container, candidates = [], { dom } = {}) {
   dom.clear(container);
-  const body = dom.el("tbody");
-  for (const candidate of snapshotArray(candidates).values) {
+  const rows = snapshotArray(candidates).values.map((candidate) => {
     const symbol = safeText(safeRead(candidate, "symbol"), "Unknown");
     const bestSetup = selectStrongestSetup(safeRead(candidate, "setups", {}));
-    dom.append(body, dom.el("tr", {},
-      dom.el("td", {}, symbol),
-      dom.el("td", {}, formatPrice(safeRead(candidate, "price"))),
-      dom.el("td", {}, safeText(safeRead(bestSetup, "mode"), "-")),
-      dom.el("td", {}, safeText(safeRead(bestSetup, "direction"), "neutral")),
-      dom.el("td", { class: "recommendation-badge" },
-        recommendationBadge(safeRead(safeRead(bestSetup, "recommendation", {}), "label"))),
-      dom.el("td", {}, renderSetupDetails(candidate, dom)),
-    ));
-  }
-  dom.append(container, dom.el("table", { class: "data-table compact-scanner-table" },
-    dom.el("thead", {}, dom.el("tr", {},
-      ...["종목", "현재가", "최고 추천 셋업", "방향", "추천 상태", "상세"].map((label) =>
-        dom.el("th", {}, label),
+    return dom.el("article", { class: "scanner-result-card" },
+      dom.el("div", { class: "scanner-result-head" },
+        dom.el("strong", {}, symbol),
+        dom.el("span", { class: "recommendation-badge" },
+          recommendationBadge(safeRead(safeRead(bestSetup, "recommendation", {}), "label"))),
       ),
-    )),
-    body,
-  ));
+      dom.el("div", { class: "scanner-result-summary" },
+        dom.el("span", {}, `현재가 ${formatPrice(safeRead(candidate, "price"))}`),
+        dom.el("span", {}, `셋업 ${safeText(safeRead(bestSetup, "mode"), "-")}`),
+        dom.el("span", {}, `방향 ${safeText(safeRead(bestSetup, "direction"), "neutral")}`),
+      ),
+      renderSetupDetails(candidate, dom),
+    );
+  });
+  if (!rows.length) {
+    dom.append(container, dom.el("p", { class: "empty-state" }, "스캐너를 실행하거나 종목을 검색하세요."));
+    return;
+  }
+  dom.append(container, dom.el("div", { class: "scanner-result-list" }, rows));
 }
 
 export function renderScannerProgress(node, { completed = 0, total = 0 } = {}, { dom }) {

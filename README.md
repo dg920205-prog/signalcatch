@@ -13,10 +13,10 @@ SignalCatch is a free static crypto-signal dashboard for GitHub Pages. It uses p
 - Daily and swing backtests simulate three split entries and three split targets with the default split profile
 - Scanner default: top `100` Bybit USDT perpetuals by 24-hour turnover, editable from `10` to `200`
 - Scanner search: verifies Bybit support first, reuses an existing result, or runs a one-symbol current-position scan outside the current universe
-- Scanner setup summary: compact rows show symbol, current price, best setup, direction, visible recommendation badge, and expandable full timeframe details
+- Scanner setup summary: vertical cards show symbol, current price, best setup, direction, visible recommendation badge, and expandable timeframe setup cards
 - Manual assets: Bybit symbols are verified before a card is created; unsupported symbols show inline feedback instead of persistent error cards
 - Market workflow: fixed-theme heatmap, `70%` strength plus `30%` liquidity ranking, top `5` default tiles per theme, lightweight `1H / 4H / 1D` chart, and analysis briefing
-- Dashboard market context: eight cards show `BTC`, `ETH`, `BTC/ETH`, `BTC.D`, `USDT.D`, `OTHERS.D`, `OTHERS`, and `TOTAL3ES`; automated scoring uses only readable Bybit data while dominance and total-market indicators remain TradingView visual references
+- Dashboard market context: eight compact cards show `BTC`, `ETH`, `BTC/ETH`, `BTC.D`, `USDT.D`, `OTHERS.D`, `OTHERS`, and `TOTAL3ES`; automated scoring uses readable Bybit data and also surfaces BTC-relative strength leaders
 - Backtest laboratory: retained as an optional advanced tool inside Settings instead of the primary navigation
 - Displayed prices use thousands separators and at most four decimal places for readability
 
@@ -39,14 +39,14 @@ Publish the static files from the repository root on the `main` branch. In GitHu
 - No credentials are stored or transmitted.
 - Persistence is opt-in and allowlisted.
 - API-origin text is rendered through DOM text nodes.
-- TradingView iframe URLs are built from a fixed allowlist only.
+- The dashboard market context uses first-party DOM/SVG rendering and does not embed third-party chart iframes.
 - External market-cap data can fail or throttle; the UI falls back to Bybit-only profile data.
 
 ## Known Temporary Limits
 
 - Daily and swing backtests use the default split profile; per-symbol profile weights are not yet injected into historical runs.
 - Common CoinGecko IDs are mapped. Unknown symbols use a lowercase fallback and may remain on Bybit-only profile data.
-- `BTC.D`, `USDT.D`, `OTHERS.D`, `OTHERS`, and `TOTAL3ES` are visual reference charts in the free static build and are not read back into the automated score.
+- `BTC.D`, `USDT.D`, `OTHERS.D`, `OTHERS`, and `TOTAL3ES` are static reference indicators in the free build and are not read back into the automated score.
 - Final CSV download-event verification must be repeated after GitHub Pages deployment.
 
 This dashboard is an analysis tool, not financial advice.
