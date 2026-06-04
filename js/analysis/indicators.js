@@ -181,3 +181,93 @@ export function volumeRatio(candles, period = 20) {
     ? finiteOrNull(volumes.at(-1) / average)
     : null;
 }
+
+export function adx(candles, period = 14) {
+  if (
+    !Array.isArray(candles) ||
+    !isValidPeriod(period) ||
+    candles.length < 2 * period + 1 ||
+    !candles.every(isValidCandle)
+  ) {
+    return null;
+  }
+
+  const trList = [];
+  const plusDmList = [];
+  const minusDmList = [];
+
+  for (let i = 1; i < candles.length; i += 1) {
+    const high = candles[i].high;
+    const low = candles[i].low;
+    const prevHigh = candles[i - 1].high;
+    const prevLow = candles[i - 1].low;
+    const prevClose = candles[i - 1].close;
+
+    const tr = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose),
+    );
+    const upMove = high - prevHigh;
+    const downMove = prevLow - low;
+    const plusDm = upMove > downMove && upMove > 0 ? upMove : 0;
+    const minusDm = downMove > upMove && downMove > 0 ? downMove : 0;
+
+    if (![tr, plusDm, minusDm].every(isFiniteNumber)) {
+      return null;
+    }
+
+    trList.push(tr);
+    plusDmList.push(plusDm);
+    minusDmList.push(minusDm);
+  }
+
+  let smoothedTr = trList.slice(0, period).reduce((s, v) => s + v, 0);
+  let smoothedPlusDm = plusDmList.slice(0, period).reduce((s, v) => s + v, 0);
+  let smoothedMinusDm = minusDmList.slice(0, period).reduce((s, v) => s + v, 0);
+
+  const dxValues = [];
+
+  for (let i = period - 1; i < trList.length; i += 1) {
+    if (i >= period) {
+      smoothedTr = smoothedTr - smoothedTr / period + trList[i];
+      smoothedPlusDm = smoothedPlusDm - smoothedPlusDm / period + plusDmList[i];
+      smoothedMinusDm = smoothedMinusDm - smoothedMinusDm / period + minusDmList[i];
+    }
+
+    if (smoothedTr <= 0) {
+      dxValues.push(0);
+      continue;
+    }
+
+    const plusDi = (100 * smoothedPlusDm) / smoothedTr;
+    const minusDi = (100 * smoothedMinusDm) / smoothedTr;
+    const sumDi = plusDi + minusDi;
+    const dx = sumDi === 0 ? 0 : (100 * Math.abs(plusDi - minusDi)) / sumDi;
+
+    if (!isFiniteNumber(dx)) {
+      return null;
+    }
+
+    dxValues.push(dx);
+  }
+
+  if (dxValues.length < period) {
+    return null;
+  }
+
+  let result = dxValues.slice(0, period).reduce((s, v) => s + v, 0) / period;
+
+  if (!isFiniteNumber(result)) {
+    return null;
+  }
+
+  for (let i = period; i < dxValues.length; i += 1) {
+    result = (result * (period - 1) + dxValues[i]) / period;
+    if (!isFiniteNumber(result)) {
+      return null;
+    }
+  }
+
+  return result;
+}
