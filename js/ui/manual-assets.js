@@ -2,6 +2,13 @@ import { safeText, snapshotArray } from "./dom.js";
 import { formatPrice } from "./format.js";
 import { recommendationBadge } from "./recommendation-badge.js";
 
+const STATUS_LABEL = {
+  loading: "로딩 중",
+  ready: "정상",
+  error: "오류",
+  idle: "대기",
+};
+
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
 function safeRead(value, key, fallback) {
@@ -52,7 +59,7 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
         dom.el("strong", {}, safeText(safeRead(asset, "symbol"), "알 수 없음")),
         dom.el("span", { class: "exchange-tag" }, safeText(safeRead(asset, "exchange"), "Bybit")),
       ),
-      dom.el("span", { class: "status-label" }, status),
+      dom.el("span", { class: "status-label" }, STATUS_LABEL[status] ?? status),
     ),
     dom.el("p", { class: "price" }, typeof tickerPrice === "number" ? formatPrice(tickerPrice) : safeText(tickerPrice, "가격 대기 중")),
     dom.el("p", { class: "quality-line" }, `진입 품질: ${quality}`),
