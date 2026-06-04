@@ -1,6 +1,7 @@
 import { safeText, snapshotArray } from "./dom.js";
 import { formatPrice } from "./format.js";
 import { recommendationBadge } from "./recommendation-badge.js";
+import { MODE_CONFIG } from "../config.js";
 
 const STATUS_LABEL = {
   loading: "로딩 중",
@@ -70,7 +71,7 @@ export function renderManualAssetCard(container, asset = {}, { dom }) {
         dom.el(
           "span",
           { class: safeRead(safeRead(modeResults, mode, {}), "eligible", false) ? "mode eligible" : "mode" },
-          mode,
+          MODE_CONFIG[mode]?.label ?? mode,
         ),
       ),
     ),

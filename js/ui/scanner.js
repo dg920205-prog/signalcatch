@@ -2,7 +2,9 @@ import { safeText, snapshotArray } from "./dom.js";
 import { formatPrice } from "./format.js";
 import { selectStrongestSetup } from "../analysis/market-heatmap.js";
 import { recommendationBadge } from "./recommendation-badge.js";
+import { MODE_CONFIG } from "../config.js";
 
+const DIRECTION_LABEL = { bull: "상승", bear: "하락", neutral: "중립" };
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 const GROUPS = [
   { key: "recommended", label: "추천", icon: "✅", labels: new Set(["추천"]) },
@@ -89,11 +91,12 @@ function renderSetupDetails(candidate, dom) {
     const recommendation = safeRead(setup, "recommendation", {});
     return dom.el("article", { class: `setup-detail-card mode-${mode}` },
       dom.el("div", { class: "setup-card-head" },
-        dom.el("strong", {}, mode),
+        dom.el("strong", {}, MODE_CONFIG[mode]?.label ?? mode),
+        dom.el("span", { hidden: true }, mode),
         dom.el("span", { class: "recommendation-badge" }, recommendationBadge(safeRead(recommendation, "label"))),
       ),
       dom.el("div", { class: "setup-card-meta" },
-        dom.el("span", {}, `방향 ${safeText(safeRead(setup, "direction"), "중립")}`),
+        dom.el("span", {}, `방향 ${DIRECTION_LABEL[safeRead(setup, "direction")] ?? "중립"}`),
       ),
       dom.el("div", { class: "setup-stat-grid" },
         dom.el("div", { class: "setup-stat setup-entry" },
@@ -138,8 +141,9 @@ export function renderScannerResults(container, candidates = [], { dom } = {}) {
       ),
       dom.el("div", { class: "scanner-result-summary" },
         dom.el("span", {}, `현재가 ${formatPrice(safeRead(candidate, "price"))}`),
-        dom.el("span", {}, `셋업 ${safeText(safeRead(bestSetup, "mode"), "-")}`),
-        dom.el("span", {}, `방향 ${safeText(safeRead(bestSetup, "direction"), "중립")}`),
+        dom.el("span", {}, `셋업 ${MODE_CONFIG[safeRead(bestSetup, "mode")]?.label ?? "-"}`),
+        dom.el("span", { hidden: true }, safeText(safeRead(bestSetup, "mode"), "")),
+        dom.el("span", {}, `방향 ${DIRECTION_LABEL[safeRead(bestSetup, "direction")] ?? "중립"}`),
       ),
       renderSetupDetails(candidate, dom),
       ),
