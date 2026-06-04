@@ -395,8 +395,17 @@ function bindDialog() {
   });
   elements.persistSettings.addEventListener("change", () => saveUiState());
   elements.exportButton?.addEventListener("click", () => {
+    // persist 상태와 무관하게 현재 인메모리 데이터를 백업하기 위해
+    // 일시적으로 persist=true 로 강제 저장 후 원복
+    const wasPersist = elements.persistSettings.checked;
+    elements.persistSettings.checked = true;
     saveUiState();
     const data = storage.exportSettings();
+    elements.persistSettings.checked = wasPersist;
+    if (!wasPersist) {
+      storage.clear();
+    }
+
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -584,7 +593,6 @@ async function runOnboardingIfNeeded() {
     showOnboardingBannerIfNotClosed();
     return;
   }
-  showOnboardingBannerIfNotClosed();
   const symbols = ["BTC", "ETH", "SOL"];
   for (const symbol of symbols) {
     try {
@@ -600,6 +608,7 @@ async function runOnboardingIfNeeded() {
   try { localStorage.setItem("signalcatch.onboarded", "true"); } catch {}
   markRefreshed();
   rerender();
+  showOnboardingBannerIfNotClosed();
 }
 
 function showOnboardingBannerIfNotClosed() {
