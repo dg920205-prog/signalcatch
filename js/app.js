@@ -26,6 +26,8 @@ const elements = {
   lastRefresh: document.querySelector("#last-refresh"),
   summaryGrid: document.querySelector("#summary-grid"),
   dashboardContext: document.querySelector("#dashboard-context"),
+  onboardingBanner: document.querySelector("#onboarding-banner"),
+  onboardingClose: document.querySelector("#onboarding-close"),
   manualForm: document.querySelector("#manual-form"),
   manualSearchResult: document.querySelector("#manual-search-result"),
   manualGrid: document.querySelector("#manual-grid"),
@@ -34,6 +36,10 @@ const elements = {
   openSettings: document.querySelector("#settings-open"),
   closeSettings: document.querySelector("#settings-close"),
   persistSettings: document.querySelector("input[name='persist']"),
+  exportButton: document.querySelector("#settings-export"),
+  importTrigger: document.querySelector("#settings-import-trigger"),
+  importFile: document.querySelector("#settings-import-file"),
+  importStatus: document.querySelector("#settings-import-status"),
   returnToMarket: document.querySelector("#backtest-return-market"),
   backtestDays: document.querySelector("#backtest-days"),
   backtestSymbols: document.querySelector("#backtest-symbols"),
@@ -149,6 +155,16 @@ function rerender() {
   const assets = enrichAssets(manualService.list());
   renderManualAssets(elements.manualGrid, assets, { dom });
   updateSummary(assets);
+}
+
+function handleScannerBacktestSelect(symbol) {
+  if (typeof symbol !== "string") return;
+  activateTab("backtest");
+  if (elements.backtestSymbols) {
+    elements.backtestSymbols.value = symbol;
+    elements.backtestSymbols.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  saveUiState({ activeTab: "backtest" });
 }
 
 function markRefreshed() {
@@ -298,7 +314,10 @@ async function runScannerFlow() {
     });
     lastScannerCandidates = candidates;
     markRefreshed();
-    renderScannerResults(elements.scannerResults, candidates, { dom });
+    renderScannerResults(elements.scannerResults, candidates, {
+      dom,
+      onBacktestSelect: handleScannerBacktestSelect,
+    });
     setApiStatus(elements.apiStatus, usedFallback ? "error" : "ready", { dom });
     rerender();
   } catch {
@@ -326,7 +345,10 @@ async function runScannerSearch(form) {
       ];
       markRefreshed();
     }
-    renderScannerResults(elements.scannerResults, [result.candidate], { dom });
+    renderScannerResults(elements.scannerResults, [result.candidate], {
+      dom,
+      onBacktestSelect: handleScannerBacktestSelect,
+    });
     dom.setText(
       elements.scannerSearchStatus,
       result.kind === "existing"
@@ -372,6 +394,41 @@ function bindDialog() {
     if (activateTab("market")) saveUiState({ activeTab: "market" });
   });
   elements.persistSettings.addEventListener("change", () => saveUiState());
+  elements.exportButton?.addEventListener("click", () => {
+    saveUiState();
+    const data = storage.exportSettings();
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    a.href = url;
+    a.download = `signalcatch-backup-${ymd}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  elements.importTrigger?.addEventListener("click", () => elements.importFile?.click());
+
+  elements.importFile?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const ok = storage.importSettings(text);
+      if (ok) {
+        dom.setText(elements.importStatus, "복원 성공. 페이지를 새로고침합니다.");
+        setTimeout(() => location.reload(), 600);
+      } else {
+        dom.setText(elements.importStatus, "백업 파일을 읽을 수 없습니다.");
+      }
+    } catch {
+      dom.setText(elements.importStatus, "백업 파일을 읽을 수 없습니다.");
+    } finally {
+      event.target.value = "";
+    }
+  });
 }
 
 function bindBacktestPresets() {
@@ -412,7 +469,11 @@ function saveUiState(nextUi = {}) {
     selectedMode: elements.recommendationMode.value,
     ...nextUi,
   };
-  savedSettings = { ...savedSettings, persist, ui };
+  const manualAssets = manualService.list().map((asset) => ({
+    symbol: asset.symbol,
+    exchange: asset.exchange,
+  }));
+  savedSettings = { ...savedSettings, persist, manualAssets, ui };
   storage.save(savedSettings);
 }
 
@@ -496,7 +557,63 @@ bindBacktestForm();
 bindScanner();
 bindMarket();
 setApiStatus(elements.apiStatus, "idle", { dom });
+
+(async () => {
+  for (const stored of savedSettings.manualAssets) {
+    try {
+      await manualService.add({ symbol: stored.symbol, exchange: stored.exchange });
+    } catch { /* 중복/오류 무시 */ }
+  }
+  if (savedSettings.manualAssets.length > 0) {
+    for (const asset of manualService.list()) {
+      try {
+        marketProfileById.set(asset.id, await marketProfileLoader.load(asset.symbol));
+      } catch {}
+    }
+    markRefreshed();
+    rerender();
+  }
+})();
+
 rerender();
+
+async function runOnboardingIfNeeded() {
+  let onboarded = false;
+  try { onboarded = localStorage.getItem("signalcatch.onboarded") === "true"; } catch { return; }
+  if (onboarded) {
+    showOnboardingBannerIfNotClosed();
+    return;
+  }
+  showOnboardingBannerIfNotClosed();
+  const symbols = ["BTC", "ETH", "SOL"];
+  for (const symbol of symbols) {
+    try {
+      const result = await manualSearchService.verify({ symbol, exchange: "bybit" });
+      if (result.kind === "verified") {
+        const asset = await manualSearchService.confirm(result);
+        if (asset?.id) {
+          marketProfileById.set(asset.id, await marketProfileLoader.load(asset.symbol));
+        }
+      }
+    } catch { /* 일부 실패해도 다음 종목 진행 */ }
+  }
+  try { localStorage.setItem("signalcatch.onboarded", "true"); } catch {}
+  markRefreshed();
+  rerender();
+}
+
+function showOnboardingBannerIfNotClosed() {
+  let closed = false;
+  try { closed = localStorage.getItem("signalcatch.onboarding-banner-closed") === "true"; } catch {}
+  if (!closed && elements.onboardingBanner) elements.onboardingBanner.hidden = false;
+}
+
+elements.onboardingClose?.addEventListener("click", () => {
+  if (elements.onboardingBanner) elements.onboardingBanner.hidden = true;
+  try { localStorage.setItem("signalcatch.onboarding-banner-closed", "true"); } catch {}
+});
+
+runOnboardingIfNeeded();
 setInterval(() => {
   updateSummary(enrichAssets(manualService.list()));
 }, 30_000);

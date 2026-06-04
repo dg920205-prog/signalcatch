@@ -198,5 +198,28 @@ export function createStorage(backend) {
         // Persistence failures must not interrupt the dashboard.
       }
     },
+
+    exportSettings() {
+      try {
+        const stored = backend.getItem(STORAGE_KEY);
+        return stored ?? JSON.stringify(createSafeDefaults());
+      } catch {
+        return JSON.stringify(createSafeDefaults());
+      }
+    },
+
+    importSettings(jsonString) {
+      try {
+        const parsed = JSON.parse(String(jsonString));
+        const sanitized = sanitizeSettings(parsed, readCandidate(parsed, "persist"));
+        if (!sanitized.persist) {
+          sanitized.persist = true;
+        }
+        backend.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }

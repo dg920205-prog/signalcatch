@@ -58,6 +58,10 @@
             </select>
           </label>
         </div>
+        <div id="onboarding-banner" class="onboarding-banner" hidden>
+          <p>BTC·ETH·SOL을 자동으로 추가했어요. 모드를 선택하면 시그널이 보입니다.</p>
+          <button type="button" id="onboarding-close" aria-label="안내 닫기">×</button>
+        </div>
         <form id="manual-form" class="inline-form">
           <label>종목<input name="symbol" placeholder="HBAR" required></label>
           <label>거래소<select name="exchange"><option value="bybit">Bybit</option><option value="binance">Binance</option></select></label>
@@ -150,6 +154,12 @@
         <div class="section-heading"><h2>설정</h2><button id="settings-close" type="button">닫기</button></div>
         <label class="toggle"><input name="persist" type="checkbox"> 이 기기에 대시보드 설정 저장</label>
         <p class="muted">설정 저장은 선택 사항입니다. API 데이터는 저장하지 않습니다.</p>
+        <div class="settings-backup">
+          <button type="button" id="settings-export">백업 파일 다운로드</button>
+          <button type="button" id="settings-import-trigger">백업 파일 가져오기</button>
+          <input type="file" id="settings-import-file" accept="application/json,.json" hidden>
+          <p id="settings-import-status" class="muted" role="status"></p>
+        </div>
       </form>
     </dialog>
     <!--

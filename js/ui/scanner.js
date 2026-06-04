@@ -125,7 +125,7 @@ function renderSetupDetails(candidate, dom) {
   );
 }
 
-export function renderScannerResults(container, candidates = [], { dom } = {}) {
+export function renderScannerResults(container, candidates = [], { dom, onBacktestSelect } = {}) {
   dom.clear(container);
   const rows = snapshotArray(candidates).values.map((candidate) => {
     const symbol = safeText(safeRead(candidate, "symbol"), "알 수 없음");
@@ -138,6 +138,13 @@ export function renderScannerResults(container, candidates = [], { dom } = {}) {
         dom.el("strong", {}, symbol),
         dom.el("span", { class: "recommendation-badge" },
           recommendationBadge(safeRead(safeRead(bestSetup, "recommendation", {}), "label"))),
+        dom.el("button", {
+          type: "button",
+          class: "scanner-backtest-button",
+          onClick: () => {
+            if (typeof onBacktestSelect === "function") onBacktestSelect(symbol);
+          },
+        }, "이 종목 백테스트"),
       ),
       dom.el("div", { class: "scanner-result-summary" },
         dom.el("span", {}, `현재가 ${formatPrice(safeRead(candidate, "price"))}`),
