@@ -147,9 +147,12 @@ function enrichAssets(rawAssets) {
 
 function rerender() {
   const assets = enrichAssets(manualService.list());
-  lastRefreshIso = new Date().toISOString();
   renderManualAssets(elements.manualGrid, assets, { dom });
   updateSummary(assets);
+}
+
+function markRefreshed() {
+  lastRefreshIso = new Date().toISOString();
   dom.setText(elements.lastRefresh, nowIso());
 }
 
@@ -160,6 +163,7 @@ async function addManualAsset(form) {
   try {
     const asset = await manualSearchService.confirm(searchResult);
     marketProfileById.set(asset.id, await marketProfileLoader.load(asset.symbol));
+    markRefreshed();
     pendingManualSearch = null;
     dom.clear(elements.manualSearchResult);
     setApiStatus(elements.apiStatus, "ready", { dom });
@@ -293,6 +297,7 @@ async function runScannerFlow() {
         renderScannerProgress(elements.scannerProgress, { completed, total }, { dom }),
     });
     lastScannerCandidates = candidates;
+    markRefreshed();
     renderScannerResults(elements.scannerResults, candidates, { dom });
     setApiStatus(elements.apiStatus, usedFallback ? "error" : "ready", { dom });
     rerender();
@@ -319,6 +324,7 @@ async function runScannerSearch(form) {
         ...lastScannerCandidates.filter((candidate) => candidate.symbol !== result.symbol),
         result.candidate,
       ];
+      markRefreshed();
     }
     renderScannerResults(elements.scannerResults, [result.candidate], { dom });
     dom.setText(
@@ -491,4 +497,7 @@ bindScanner();
 bindMarket();
 setApiStatus(elements.apiStatus, "idle", { dom });
 rerender();
+setInterval(() => {
+  updateSummary(enrichAssets(manualService.list()));
+}, 30_000);
 loadDashboardContext();
