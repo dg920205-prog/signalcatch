@@ -854,3 +854,70 @@ test("scanner applies compound multiplier (trend × structure) to final score", 
   const combined = setup.trendGating.multiplier * setup.structureGating.multiplier;
   assert.notEqual(combined, 1.0, "Compound multiplier should not equal 1.0 in strong uptrend");
 });
+
+test("scanner sets cvdGating to null when fetchHtfCandles not provided", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "BTCUSDT", price: 100 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["BTC"] });
+  assert.equal(candidate.setups.common.cvdGating, null);
+});
+
+test("scanner populates cvdGating when fetchHtfCandles provided", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  assert.ok(candidate.setups.common.cvdGating);
+  assert.equal(typeof candidate.setups.common.cvdGating.state, "string");
+  assert.equal(typeof candidate.setups.common.cvdGating.multiplier, "number");
+});
+
+test("scanner CVD detection reuses cached HTF candles (no extra fetches)", async () => {
+  const htfCalls = [];
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "SOLUSDT", price: 100 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async (symbol, htfInterval) => {
+        htfCalls.push([symbol, htfInterval]);
+        return htfTrendingCandles("up", 600);
+      },
+    },
+  });
+  await service.run({ symbols: ["SOL"] });
+  const solCalls = htfCalls.filter(([symbol]) => symbol === "SOL");
+  assert.equal(solCalls.length, 3);
+});
+
+test("scanner applies 3-layer compound multiplier (trend × structure × cvd)", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  const setup = candidate.setups.common;
+  assert.equal(typeof setup.trendGating.multiplier, "number");
+  assert.equal(typeof setup.structureGating.multiplier, "number");
+  assert.equal(typeof setup.cvdGating.multiplier, "number");
+  const combined =
+    setup.trendGating.multiplier *
+    setup.structureGating.multiplier *
+    setup.cvdGating.multiplier;
+  assert.ok(Number.isFinite(combined));
+  assert.ok(combined > 0, "combined multiplier should be positive");
+});

@@ -2,8 +2,9 @@ import { analyzeCandles, classifyModes } from "../analysis/signals.js";
 import { buildRecommendation } from "../analysis/recommendation.js";
 import { normalizeBaseSymbol } from "../core/symbols.js";
 import { MODE_CONFIG, TREND_GATING } from "../config.js";
-import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier } from "../analysis/trend-gating.js";
+import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, applyCvdMultiplier } from "../analysis/trend-gating.js";
 import { computeStructureState } from "../analysis/structure.js";
+import { computeCvdState } from "../analysis/cvd.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -206,6 +207,7 @@ export function createScannerService({
                 let finalAnalysis = modeAnalysis;
                 let trendGatingOutput = null;
                 let structureGatingOutput = null;
+                let cvdGatingOutput = null;
 
                 if (bybit.fetchHtfCandles) {
                   const modeConfig = MODE_CONFIG[mode];
@@ -259,6 +261,17 @@ export function createScannerService({
                         state: structureResult.state,
                         multiplier: finalAnalysis.structureMultiplier ?? 1.0,
                       };
+                      const cvdResult = computeCvdState({
+                        candles: htfCandles,
+                      });
+                      finalAnalysis = applyCvdMultiplier(
+                        finalAnalysis,
+                        cvdResult.state,
+                      );
+                      cvdGatingOutput = {
+                        state: cvdResult.state,
+                        multiplier: finalAnalysis.cvdMultiplier ?? 1.0,
+                      };
                     } else {
                       trendGatingOutput = {
                         state: "insufficient_data",
@@ -267,6 +280,10 @@ export function createScannerService({
                       };
                       structureGatingOutput = {
                         state: "unknown",
+                        multiplier: 1.0,
+                      };
+                      cvdGatingOutput = {
+                        state: "insufficient_data",
                         multiplier: 1.0,
                       };
                     }
@@ -287,6 +304,7 @@ export function createScannerService({
                   recommendation,
                   trendGating: trendGatingOutput,
                   structureGating: structureGatingOutput,
+                  cvdGating: cvdGatingOutput,
                 };
               }
               throwIfAborted(signal);
