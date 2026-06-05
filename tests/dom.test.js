@@ -21,7 +21,7 @@ import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderDashboardContext } from "../js/ui/dashboard-context.js";
 import { tradingViewReferenceUrl } from "../js/ui/tradingview.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
-import { trendBadgeText, btcOverlayMark, trendMultiplierText } from "../js/ui/trend-badge.js";
+import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText } from "../js/ui/trend-badge.js";
 
 const INVALID_BACKTEST_SETTINGS = /잘못된 백테스트 설정입니다\./;
 
@@ -1185,4 +1185,64 @@ test("scanner results show trend badge when trendGating present", () => {
   assert.match(text, /🟢 강세/);
   assert.match(text, /⚡ BTC 보정/);
   assert.match(text, /점수 ×1\.20/);
+});
+
+test("structureBadgeText returns null for missing input", () => {
+  assert.equal(structureBadgeText(null), null);
+  assert.equal(structureBadgeText(undefined), null);
+  assert.equal(structureBadgeText({}), null);
+  assert.equal(structureBadgeText({ state: "weird_state" }), null);
+});
+
+test("structureBadgeText returns labels for valid states", () => {
+  assert.equal(structureBadgeText({ state: "bullish_structure" }), "📊 강세 구조");
+  assert.equal(structureBadgeText({ state: "bearish_structure" }), "📊 약세 구조");
+  assert.equal(structureBadgeText({ state: "mixed" }), "📊 혼조");
+});
+
+test("structureBadgeText returns null for unknown state", () => {
+  assert.equal(structureBadgeText({ state: "unknown" }), null);
+});
+
+test("structureMultiplierText hides multiplier when 1.0", () => {
+  assert.equal(structureMultiplierText({ multiplier: 1.0 }), null);
+  assert.equal(structureMultiplierText({ multiplier: 1.05 }), "구조 ×1.05");
+  assert.equal(structureMultiplierText({ multiplier: 0.95 }), "구조 ×0.95");
+  assert.equal(structureMultiplierText(null), null);
+});
+
+test("scanner results show structure badge when structureGating present", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+
+  renderScannerResults(
+    container,
+    [{
+      symbol: "ETH",
+      price: 2000,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan: { entryLow: 1990, entryHigh: 2010, sl: 1950, tp: 2100 },
+          recommendation: { label: "추천" },
+          trendGating: {
+            state: "strong_bull",
+            multiplier: 1.2,
+            btcOverlayApplied: false,
+          },
+          structureGating: {
+            state: "bullish_structure",
+            multiplier: 1.05,
+          },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.match(text, /📊 강세 구조/);
+  assert.match(text, /구조 ×1\.05/);
 });

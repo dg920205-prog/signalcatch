@@ -3,7 +3,7 @@ import { formatPrice } from "./format.js";
 import { selectStrongestSetup } from "../analysis/market-heatmap.js";
 import { recommendationBadge } from "./recommendation-badge.js";
 import { MODE_CONFIG } from "../config.js";
-import { trendBadgeText, btcOverlayMark, trendMultiplierText } from "./trend-badge.js";
+import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText } from "./trend-badge.js";
 
 const DIRECTION_LABEL = { bull: "상승", bear: "하락", neutral: "중립" };
 const MODES = ["common", "scalp", "day", "daily", "swing"];
@@ -110,6 +110,14 @@ function renderSetupDetails(candidate, dom) {
           const mult = trendMultiplierText(safeRead(setup, "trendGating"));
           return mult ? dom.el("span", { class: "trend-multiplier" }, mult) : null;
         })(),
+        (() => {
+          const badge = structureBadgeText(safeRead(setup, "structureGating"));
+          return badge ? dom.el("span", { class: "structure-badge" }, badge) : null;
+        })(),
+        (() => {
+          const mult = structureMultiplierText(safeRead(setup, "structureGating"));
+          return mult ? dom.el("span", { class: "structure-multiplier" }, mult) : null;
+        })(),
       ),
       dom.el("div", { class: "setup-stat-grid" },
         dom.el("div", { class: "setup-stat setup-entry" },
@@ -171,6 +179,10 @@ export function renderScannerResults(container, candidates = [], { dom, onBackte
         (() => {
           const mark = btcOverlayMark(safeRead(bestSetup, "trendGating"));
           return mark ? dom.el("span", { class: "trend-btc-overlay" }, mark) : null;
+        })(),
+        (() => {
+          const badge = structureBadgeText(safeRead(bestSetup, "structureGating"));
+          return badge ? dom.el("span", { class: "structure-badge" }, badge) : null;
         })(),
       ),
       renderSetupDetails(candidate, dom),
