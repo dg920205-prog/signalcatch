@@ -96,6 +96,8 @@ const scannerService = createScannerService({
       fetchBybitCandles(symbol, { interval: MODE_CONFIG.common.interval, limit: 250, signal }),
     fetchModeCandles: (symbol, mode, { signal } = {}) =>
       fetchBybitCandles(symbol, { interval: MODE_CONFIG[mode].interval, limit: 250, signal }),
+    fetchHtfCandles: (symbol, htfInterval, { signal } = {}) =>
+      fetchBybitCandles(symbol, { interval: htfInterval, limit: 600, signal }),
   },
 });
 const marketService = createMarketService({

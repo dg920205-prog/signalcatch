@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { analyzeMarketRegime } from "../js/analysis/market-regime.js";
+import { TREND_STATES } from "../js/analysis/trend-gating.js";
 import { createManualAssetService } from "../js/services/manual-assets.js";
 import { createScannerService } from "../js/services/scanner.js";
 
@@ -657,4 +658,129 @@ test("scanner diagnostics tolerate throwing detail getters and proxies", async (
     JSON.stringify(candidates).includes("private"),
     false,
   );
+});
+
+function htfTrendingCandles(direction, count = 600) {
+  const candles = [];
+  let price = 10000;
+  const step = direction === "up" ? 8 : direction === "down" ? -8 : 0;
+  for (let i = 0; i < count; i += 1) {
+    const open = price;
+    const close = price + step;
+    const high = Math.max(open, close) + 2;
+    const low = Math.min(open, close) - 2;
+    candles.push({ open, high, low, close, volume: 1000 });
+    price = close;
+  }
+  return candles;
+}
+
+test("scanner skips trend gating when fetchHtfCandles not provided", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "BTCUSDT", price: 100 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["BTC"] });
+  assert.equal(candidate.setups.common.trendGating, null);
+});
+
+test("scanner applies trend gating when fetchHtfCandles provided", async () => {
+  const htfCalls = [];
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async (symbol, htfInterval) => {
+        htfCalls.push([symbol, htfInterval]);
+        return htfTrendingCandles("up", 600);
+      },
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  assert.ok(candidate.setups.common.trendGating);
+  assert.equal(typeof candidate.setups.common.trendGating.state, "string");
+  assert.equal(typeof candidate.setups.common.trendGating.multiplier, "number");
+  const symbolsFetched = htfCalls.map(([symbol]) => symbol);
+  assert.ok(symbolsFetched.includes("BTC"));
+});
+
+test("scanner caches HTF candles per symbol across modes sharing same htfInterval", async () => {
+  const htfCalls = [];
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "SOLUSDT", price: 100 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async (symbol, htfInterval) => {
+        htfCalls.push([symbol, htfInterval]);
+        return htfTrendingCandles("up", 600);
+      },
+    },
+  });
+  await service.run({ symbols: ["SOL"] });
+  const solCalls = htfCalls.filter(([symbol]) => symbol === "SOL");
+  assert.equal(solCalls.length, 3);
+});
+
+test("scanner survives BTC HTF pre-fetch failure", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async (symbol) => {
+        if (symbol === "BTC") {
+          throw new Error("BTC fetch failed");
+        }
+        return htfTrendingCandles("up", 600);
+      },
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  assert.equal(candidate.status, "ready");
+  assert.ok(candidate.setups.common.trendGating);
+  assert.equal(candidate.setups.common.trendGating.btcOverlayApplied, false);
+});
+
+test("scanner survives per-mode HTF fetch failure", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ADAUSDT", price: 0.5 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async (symbol) => {
+        if (symbol === "ADA") {
+          throw new Error("ADA HTF fetch failed");
+        }
+        return htfTrendingCandles("up", 600);
+      },
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ADA"] });
+  assert.equal(candidate.status, "ready");
+  assert.equal(candidate.setups.common.trendGating.state, "insufficient_data");
+  assert.equal(candidate.setups.common.trendGating.multiplier, 1.0);
+});
+
+test("scanner does not apply BTC overlay for BTC symbol itself", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "BTCUSDT", price: 50000 }),
+      fetchCandles: async () => trendingCandles(100, -2),
+      fetchModeCandles: async () => trendingCandles(100, -2),
+      fetchHtfCandles: async () => htfTrendingCandles("down", 600),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["BTC"] });
+  for (const mode of MODES) {
+    assert.equal(
+      candidate.setups[mode].trendGating.btcOverlayApplied,
+      false,
+      `BTC ${mode} should not have BTC overlay applied`,
+    );
+  }
 });

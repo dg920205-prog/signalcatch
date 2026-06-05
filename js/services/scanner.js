@@ -1,6 +1,8 @@
 import { analyzeCandles, classifyModes } from "../analysis/signals.js";
 import { buildRecommendation } from "../analysis/recommendation.js";
 import { normalizeBaseSymbol } from "../core/symbols.js";
+import { MODE_CONFIG, TREND_GATING } from "../config.js";
+import { computeTrendState, applyTrendMultiplier } from "../analysis/trend-gating.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -139,6 +141,33 @@ export function createScannerService({
         throwIfAborted(signal);
 
         const normalizedSymbols = normalizeSymbols(symbols, maxSymbols);
+        let btcContext = null;
+        if (bybit.fetchHtfCandles) {
+          try {
+            const btcCandles = await Promise.resolve().then(() =>
+              bybit.fetchHtfCandles(
+                TREND_GATING.btcSymbol,
+                TREND_GATING.btcHtfInterval,
+                { signal },
+              ),
+            );
+            throwIfAborted(signal);
+            const btcStateResult = computeTrendState({
+              candles: btcCandles,
+              longEmaPeriod: TREND_GATING.btcHtfLongEmaPeriod,
+              shortEmaPeriod: TREND_GATING.btcHtfShortEmaPeriod,
+            });
+            btcContext = { state: btcStateResult.state };
+          } catch (error) {
+            if (
+              safeRead(error, "name") === "AbortError" ||
+              safeRead(signal, "aborted")
+            ) {
+              throw abortError();
+            }
+            btcContext = null;
+          }
+        }
         const candidates = new Array(normalizedSymbols.length);
         let nextIndex = 0;
         let completed = 0;
@@ -166,23 +195,80 @@ export function createScannerService({
                 ? await Promise.resolve().then(() => bybit.fetchTicker(symbol))
                 : null;
               const setups = {};
+              const htfCache = new Map();
+              const isBtc = symbol === TREND_GATING.btcSymbol;
               for (const mode of MODES) {
                 const candles = sharedCandles ?? await Promise.resolve().then(() =>
                   bybit.fetchModeCandles(symbol, mode, { signal }),
                 );
                 const modeAnalysis = analyze(candles);
-                const modeResults = signalClassify(modeAnalysis);
+                let finalAnalysis = modeAnalysis;
+                let trendGatingOutput = null;
+
+                if (bybit.fetchHtfCandles) {
+                  const modeConfig = MODE_CONFIG[mode];
+                  const htfInterval = modeConfig?.htfInterval;
+                  if (htfInterval) {
+                    if (!htfCache.has(htfInterval)) {
+                      try {
+                        const htfCandles = await Promise.resolve().then(() =>
+                          bybit.fetchHtfCandles(symbol, htfInterval, { signal }),
+                        );
+                        htfCache.set(htfInterval, htfCandles);
+                      } catch (error) {
+                        if (
+                          safeRead(error, "name") === "AbortError" ||
+                          safeRead(signal, "aborted")
+                        ) {
+                          throw abortError();
+                        }
+                        htfCache.set(htfInterval, null);
+                      }
+                    }
+                    const htfCandles = htfCache.get(htfInterval);
+                    if (htfCandles) {
+                      const stateResult = computeTrendState({
+                        candles: htfCandles,
+                        longEmaPeriod: modeConfig.htfLongEmaPeriod,
+                        shortEmaPeriod: modeConfig.htfShortEmaPeriod,
+                      });
+                      const btcCtxForMode = btcContext
+                        ? { ...btcContext, isBtc }
+                        : null;
+                      finalAnalysis = applyTrendMultiplier(
+                        modeAnalysis,
+                        stateResult.state,
+                        btcCtxForMode,
+                      );
+                      trendGatingOutput = {
+                        state: stateResult.state,
+                        multiplier: finalAnalysis.trendMultiplier ?? 1.0,
+                        btcOverlayApplied:
+                          finalAnalysis.btcOverlayApplied ?? false,
+                      };
+                    } else {
+                      trendGatingOutput = {
+                        state: "insufficient_data",
+                        multiplier: 1.0,
+                        btcOverlayApplied: false,
+                      };
+                    }
+                  }
+                }
+
+                const modeResults = signalClassify(finalAnalysis);
                 const recommendation = buildRecommendation({
-                  analysis: modeAnalysis,
+                  analysis: finalAnalysis,
                   modeResults,
                   mode,
                 });
                 setups[mode] = {
                   mode,
-                  direction: modeAnalysis.direction,
-                  analysis: modeAnalysis,
+                  direction: finalAnalysis.direction,
+                  analysis: finalAnalysis,
                   plan: recommendation.plan,
                   recommendation,
+                  trendGating: trendGatingOutput,
                 };
               }
               throwIfAborted(signal);
