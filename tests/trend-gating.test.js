@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, TREND_STATES } from "../js/analysis/trend-gating.js";
+import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, applyCvdMultiplier, TREND_STATES } from "../js/analysis/trend-gating.js";
 
 function trendCandles(count, mode) {
   const candles = [];
@@ -130,4 +130,37 @@ test("applyStructureMultiplier compounds with prior trend multiplication", () =>
   assert.ok(Math.abs(afterStructure.score - 63.0) < 0.01);
   assert.equal(afterStructure.trendMultiplier, 1.2);
   assert.equal(afterStructure.structureMultiplier, 1.05);
+});
+
+test("applyCvdMultiplier boosts long signal in bullish_divergence", () => {
+  const analysis = { direction: "bull", score: 60, confidence: 60 };
+  const result = applyCvdMultiplier(analysis, "bullish_divergence");
+  assert.ok(result.score > analysis.score);
+  assert.equal(result.cvdMultiplier, 1.05);
+  assert.equal(result.cvdState, "bullish_divergence");
+});
+
+test("applyCvdMultiplier reduces long signal in bearish_divergence", () => {
+  const analysis = { direction: "bull", score: 60, confidence: 60 };
+  const result = applyCvdMultiplier(analysis, "bearish_divergence");
+  assert.ok(result.score < analysis.score);
+  assert.equal(result.cvdMultiplier, 0.95);
+});
+
+test("applyCvdMultiplier returns 1.0 multiplier for none/insufficient_data", () => {
+  const analysis = { direction: "bull", score: 60, confidence: 60 };
+  assert.equal(applyCvdMultiplier(analysis, "none").cvdMultiplier, 1.0);
+  assert.equal(applyCvdMultiplier(analysis, "insufficient_data").cvdMultiplier, 1.0);
+  assert.equal(applyCvdMultiplier(analysis, undefined).cvdMultiplier, 1.0);
+});
+
+test("applyCvdMultiplier compounds with trend x structure multiplication", () => {
+  const baseAnalysis = { direction: "bull", score: 50, confidence: 50 };
+  const afterTrend = applyTrendMultiplier(baseAnalysis, TREND_STATES.STRONG_BULL);
+  const afterStructure = applyStructureMultiplier(afterTrend, "bullish_structure");
+  const afterCvd = applyCvdMultiplier(afterStructure, "bullish_divergence");
+  assert.ok(Math.abs(afterCvd.score - 66.15) < 0.01);
+  assert.equal(afterCvd.trendMultiplier, 1.2);
+  assert.equal(afterCvd.structureMultiplier, 1.05);
+  assert.equal(afterCvd.cvdMultiplier, 1.05);
 });

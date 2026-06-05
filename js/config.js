@@ -98,3 +98,21 @@ export const STRUCTURE_GATING = Object.freeze({
     }),
   }),
 });
+
+export const CVD_GATING = Object.freeze({
+  swingLookback: 2,
+  multipliers: Object.freeze({
+    long: Object.freeze({
+      bullish_divergence: 1.05,
+      bearish_divergence: 0.95,
+      none: 1.00,
+      insufficient_data: 1.00,
+    }),
+    short: Object.freeze({
+      bullish_divergence: 0.95,
+      bearish_divergence: 1.05,
+      none: 1.00,
+      insufficient_data: 1.00,
+    }),
+  }),
+});

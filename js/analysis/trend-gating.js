@@ -1,5 +1,5 @@
 import { adx, ema } from "./indicators.js";
-import { TREND_GATING, STRUCTURE_GATING } from "../config.js";
+import { TREND_GATING, STRUCTURE_GATING, CVD_GATING } from "../config.js";
 
 export const TREND_STATES = Object.freeze({
   STRONG_BULL: "strong_bull",
@@ -146,5 +146,36 @@ export function applyStructureMultiplier(analysis, structureState) {
     confidence: newConfidence,
     structureState: stateKey,
     structureMultiplier: mult,
+  };
+}
+
+export function applyCvdMultiplier(analysis, cvdState) {
+  if (!analysis || typeof analysis !== "object") {
+    return analysis;
+  }
+  const direction = analysis.direction;
+  const stateKey = cvdState ?? "none";
+
+  if (direction !== "bull" && direction !== "bear") {
+    return {
+      ...analysis,
+      cvdState: stateKey,
+      cvdMultiplier: 1.0,
+    };
+  }
+
+  const directionKey = direction === "bull" ? "long" : "short";
+  const mult = CVD_GATING.multipliers[directionKey]?.[stateKey] ?? 1.0;
+
+  const baseScore = isFiniteNumber(analysis.score) ? analysis.score : 0;
+  const newScore = baseScore * mult;
+  const newConfidence = Math.min(Math.abs(newScore), 100);
+
+  return {
+    ...analysis,
+    score: newScore,
+    confidence: newConfidence,
+    cvdState: stateKey,
+    cvdMultiplier: mult,
   };
 }
