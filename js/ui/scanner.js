@@ -3,6 +3,7 @@ import { formatPrice } from "./format.js";
 import { selectStrongestSetup } from "../analysis/market-heatmap.js";
 import { recommendationBadge } from "./recommendation-badge.js";
 import { MODE_CONFIG } from "../config.js";
+import { trendBadgeText, btcOverlayMark, trendMultiplierText } from "./trend-badge.js";
 
 const DIRECTION_LABEL = { bull: "상승", bear: "하락", neutral: "중립" };
 const MODES = ["common", "scalp", "day", "daily", "swing"];
@@ -97,6 +98,18 @@ function renderSetupDetails(candidate, dom) {
       ),
       dom.el("div", { class: "setup-card-meta" },
         dom.el("span", {}, `방향 ${DIRECTION_LABEL[safeRead(setup, "direction")] ?? "중립"}`),
+        (() => {
+          const badge = trendBadgeText(safeRead(setup, "trendGating"));
+          return badge ? dom.el("span", { class: "trend-badge" }, `HTF ${badge}`) : null;
+        })(),
+        (() => {
+          const mark = btcOverlayMark(safeRead(setup, "trendGating"));
+          return mark ? dom.el("span", { class: "trend-btc-overlay" }, mark) : null;
+        })(),
+        (() => {
+          const mult = trendMultiplierText(safeRead(setup, "trendGating"));
+          return mult ? dom.el("span", { class: "trend-multiplier" }, mult) : null;
+        })(),
       ),
       dom.el("div", { class: "setup-stat-grid" },
         dom.el("div", { class: "setup-stat setup-entry" },
@@ -151,6 +164,14 @@ export function renderScannerResults(container, candidates = [], { dom, onBackte
         dom.el("span", {}, `셋업 ${MODE_CONFIG[safeRead(bestSetup, "mode")]?.label ?? "-"}`),
         dom.el("span", { hidden: true }, safeText(safeRead(bestSetup, "mode"), "")),
         dom.el("span", {}, `방향 ${DIRECTION_LABEL[safeRead(bestSetup, "direction")] ?? "중립"}`),
+        (() => {
+          const badge = trendBadgeText(safeRead(bestSetup, "trendGating"));
+          return badge ? dom.el("span", { class: "trend-badge" }, badge) : null;
+        })(),
+        (() => {
+          const mark = btcOverlayMark(safeRead(bestSetup, "trendGating"));
+          return mark ? dom.el("span", { class: "trend-btc-overlay" }, mark) : null;
+        })(),
       ),
       renderSetupDetails(candidate, dom),
       ),

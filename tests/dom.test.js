@@ -21,6 +21,7 @@ import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderDashboardContext } from "../js/ui/dashboard-context.js";
 import { tradingViewReferenceUrl } from "../js/ui/tradingview.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
+import { trendBadgeText, btcOverlayMark, trendMultiplierText } from "../js/ui/trend-badge.js";
 
 const INVALID_BACKTEST_SETTINGS = /잘못된 백테스트 설정입니다\./;
 
@@ -1122,4 +1123,66 @@ test("tab controller updates aria state, visibility, and arrow-key focus", () =>
   assert.deepEqual(changedTabs, ["market", "backtest"]);
   assert.equal(activateTab("backtest", root), true);
   assert.equal(panels[3].hidden, false);
+});
+
+test("trendBadgeText returns null for missing input", () => {
+  assert.equal(trendBadgeText(null), null);
+  assert.equal(trendBadgeText(undefined), null);
+  assert.equal(trendBadgeText({}), null);
+  assert.equal(trendBadgeText({ state: "unknown_state" }), null);
+});
+
+test("trendBadgeText returns labels for valid states", () => {
+  assert.equal(trendBadgeText({ state: "strong_bull" }), "🟢 강세");
+  assert.equal(trendBadgeText({ state: "weak_bull" }), "🟢 약");
+  assert.equal(trendBadgeText({ state: "neutral" }), "⚪ 중립");
+  assert.equal(trendBadgeText({ state: "weak_bear" }), "🔴 약");
+  assert.equal(trendBadgeText({ state: "strong_bear" }), "🔴 강세");
+  assert.equal(trendBadgeText({ state: "insufficient_data" }), "⚪ 데이터 부족");
+});
+
+test("btcOverlayMark returns text only when applied", () => {
+  assert.equal(btcOverlayMark(null), null);
+  assert.equal(btcOverlayMark({ btcOverlayApplied: false }), null);
+  assert.equal(btcOverlayMark({ btcOverlayApplied: true }), "⚡ BTC 보정");
+});
+
+test("trendMultiplierText hides multiplier when 1.0", () => {
+  assert.equal(trendMultiplierText({ multiplier: 1.0 }), null);
+  assert.equal(trendMultiplierText({ multiplier: 1.2 }), "점수 ×1.20");
+  assert.equal(trendMultiplierText({ multiplier: 0.3 }), "점수 ×0.30");
+  assert.equal(trendMultiplierText(null), null);
+});
+
+test("scanner results show trend badge when trendGating present", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+
+  renderScannerResults(
+    container,
+    [{
+      symbol: "ETH",
+      price: 2000,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan: { entryLow: 1990, entryHigh: 2010, sl: 1950, tp: 2100 },
+          recommendation: { label: "추천" },
+          trendGating: {
+            state: "strong_bull",
+            multiplier: 1.2,
+            btcOverlayApplied: true,
+          },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.match(text, /🟢 강세/);
+  assert.match(text, /⚡ BTC 보정/);
+  assert.match(text, /점수 ×1\.20/);
 });
