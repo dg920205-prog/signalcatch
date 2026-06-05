@@ -40,3 +40,21 @@ export function structureMultiplierText(structureGating) {
   if (structureGating.multiplier === 1.0) return null;
   return `구조 ×${structureGating.multiplier.toFixed(2)}`;
 }
+
+const CVD_BADGES = {
+  bullish_divergence: "↗️ CVD 강세",
+  bearish_divergence: "↘️ CVD 약세",
+  none: null,
+  insufficient_data: null,
+};
+
+export function cvdBadgeText(cvdGating) {
+  if (!cvdGating || typeof cvdGating !== "object") return null;
+  return CVD_BADGES[cvdGating.state] ?? null;
+}
+
+export function cvdMultiplierText(cvdGating) {
+  if (!cvdGating || typeof cvdGating.multiplier !== "number") return null;
+  if (cvdGating.multiplier === 1.0) return null;
+  return `CVD ×${cvdGating.multiplier.toFixed(2)}`;
+}

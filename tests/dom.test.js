@@ -21,7 +21,7 @@ import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderDashboardContext } from "../js/ui/dashboard-context.js";
 import { tradingViewReferenceUrl } from "../js/ui/tradingview.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
-import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText } from "../js/ui/trend-badge.js";
+import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText, cvdBadgeText, cvdMultiplierText } from "../js/ui/trend-badge.js";
 
 const INVALID_BACKTEST_SETTINGS = /잘못된 백테스트 설정입니다\./;
 
@@ -1245,4 +1245,58 @@ test("scanner results show structure badge when structureGating present", () => 
   const text = flattenText(container);
   assert.match(text, /📊 강세 구조/);
   assert.match(text, /구조 ×1\.05/);
+});
+
+test("cvdBadgeText returns null for missing input", () => {
+  assert.equal(cvdBadgeText(null), null);
+  assert.equal(cvdBadgeText(undefined), null);
+  assert.equal(cvdBadgeText({}), null);
+  assert.equal(cvdBadgeText({ state: "weird_state" }), null);
+});
+
+test("cvdBadgeText returns labels for divergence states", () => {
+  assert.equal(cvdBadgeText({ state: "bullish_divergence" }), "↗️ CVD 강세");
+  assert.equal(cvdBadgeText({ state: "bearish_divergence" }), "↘️ CVD 약세");
+});
+
+test("cvdBadgeText returns null for none and insufficient_data", () => {
+  assert.equal(cvdBadgeText({ state: "none" }), null);
+  assert.equal(cvdBadgeText({ state: "insufficient_data" }), null);
+});
+
+test("cvdMultiplierText hides multiplier when 1.0", () => {
+  assert.equal(cvdMultiplierText({ multiplier: 1.0 }), null);
+  assert.equal(cvdMultiplierText({ multiplier: 1.05 }), "CVD ×1.05");
+  assert.equal(cvdMultiplierText({ multiplier: 0.95 }), "CVD ×0.95");
+  assert.equal(cvdMultiplierText(null), null);
+});
+
+test("scanner results show CVD badge when cvdGating present with divergence", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+
+  renderScannerResults(
+    container,
+    [{
+      symbol: "ETH",
+      price: 2000,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan: { entryLow: 1990, entryHigh: 2010, sl: 1950, tp: 2100 },
+          recommendation: { label: "추천" },
+          trendGating: { state: "strong_bull", multiplier: 1.2, btcOverlayApplied: false },
+          structureGating: { state: "bullish_structure", multiplier: 1.05 },
+          cvdGating: { state: "bullish_divergence", multiplier: 1.05 },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.match(text, /↗️ CVD 강세/);
+  assert.match(text, /CVD ×1\.05/);
 });
