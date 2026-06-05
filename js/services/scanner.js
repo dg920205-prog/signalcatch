@@ -2,7 +2,8 @@ import { analyzeCandles, classifyModes } from "../analysis/signals.js";
 import { buildRecommendation } from "../analysis/recommendation.js";
 import { normalizeBaseSymbol } from "../core/symbols.js";
 import { MODE_CONFIG, TREND_GATING } from "../config.js";
-import { computeTrendState, applyTrendMultiplier } from "../analysis/trend-gating.js";
+import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier } from "../analysis/trend-gating.js";
+import { computeStructureState } from "../analysis/structure.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
 
@@ -204,6 +205,7 @@ export function createScannerService({
                 const modeAnalysis = analyze(candles);
                 let finalAnalysis = modeAnalysis;
                 let trendGatingOutput = null;
+                let structureGatingOutput = null;
 
                 if (bybit.fetchHtfCandles) {
                   const modeConfig = MODE_CONFIG[mode];
@@ -246,11 +248,26 @@ export function createScannerService({
                         btcOverlayApplied:
                           finalAnalysis.btcOverlayApplied ?? false,
                       };
+                      const structureResult = computeStructureState({
+                        candles: htfCandles,
+                      });
+                      finalAnalysis = applyStructureMultiplier(
+                        finalAnalysis,
+                        structureResult.state,
+                      );
+                      structureGatingOutput = {
+                        state: structureResult.state,
+                        multiplier: finalAnalysis.structureMultiplier ?? 1.0,
+                      };
                     } else {
                       trendGatingOutput = {
                         state: "insufficient_data",
                         multiplier: 1.0,
                         btcOverlayApplied: false,
+                      };
+                      structureGatingOutput = {
+                        state: "unknown",
+                        multiplier: 1.0,
                       };
                     }
                   }
@@ -269,6 +286,7 @@ export function createScannerService({
                   plan: recommendation.plan,
                   recommendation,
                   trendGating: trendGatingOutput,
+                  structureGating: structureGatingOutput,
                 };
               }
               throwIfAborted(signal);

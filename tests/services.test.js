@@ -784,3 +784,73 @@ test("scanner does not apply BTC overlay for BTC symbol itself", async () => {
     );
   }
 });
+
+test("scanner sets structureGating to null when fetchHtfCandles not provided", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "BTCUSDT", price: 100 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["BTC"] });
+  assert.equal(candidate.setups.common.structureGating, null);
+});
+
+test("scanner populates structureGating when fetchHtfCandles provided", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  assert.ok(candidate.setups.common.structureGating);
+  assert.equal(typeof candidate.setups.common.structureGating.state, "string");
+  assert.equal(typeof candidate.setups.common.structureGating.multiplier, "number");
+});
+
+test("scanner structure detection reuses cached HTF candles (no extra fetches)", async () => {
+  const htfCalls = [];
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "SOLUSDT", price: 100 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async (symbol, htfInterval) => {
+        htfCalls.push([symbol, htfInterval]);
+        return htfTrendingCandles("up", 600);
+      },
+    },
+  });
+  await service.run({ symbols: ["SOL"] });
+  const solCalls = htfCalls.filter(([symbol]) => symbol === "SOL");
+  assert.equal(solCalls.length, 3);
+  const [candidate] = await service.run({ symbols: ["SOL"] });
+  for (const mode of MODES) {
+    assert.ok(
+      candidate.setups[mode].structureGating,
+      `${mode} should have structureGating populated`,
+    );
+  }
+});
+
+test("scanner applies compound multiplier (trend × structure) to final score", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  const setup = candidate.setups.common;
+  assert.equal(typeof setup.trendGating.multiplier, "number");
+  assert.equal(typeof setup.structureGating.multiplier, "number");
+  assert.equal(typeof setup.analysis.score, "number");
+  const combined = setup.trendGating.multiplier * setup.structureGating.multiplier;
+  assert.notEqual(combined, 1.0, "Compound multiplier should not equal 1.0 in strong uptrend");
+});
