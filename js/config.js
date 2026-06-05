@@ -80,3 +80,21 @@ export const TREND_GATING = Object.freeze({
     }),
   }),
 });
+
+export const STRUCTURE_GATING = Object.freeze({
+  swingLookback: 2,
+  multipliers: Object.freeze({
+    long: Object.freeze({
+      bullish_structure: 1.05,
+      bearish_structure: 0.95,
+      mixed: 1.00,
+      unknown: 1.00,
+    }),
+    short: Object.freeze({
+      bullish_structure: 0.95,
+      bearish_structure: 1.05,
+      mixed: 1.00,
+      unknown: 1.00,
+    }),
+  }),
+});

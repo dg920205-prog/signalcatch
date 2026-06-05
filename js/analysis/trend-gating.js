@@ -1,5 +1,5 @@
 import { adx, ema } from "./indicators.js";
-import { TREND_GATING } from "../config.js";
+import { TREND_GATING, STRUCTURE_GATING } from "../config.js";
 
 export const TREND_STATES = Object.freeze({
   STRONG_BULL: "strong_bull",
@@ -115,5 +115,36 @@ export function applyTrendMultiplier(analysis, trendState, btcContext = null) {
     trendState: stateKey,
     trendMultiplier: finalMultiplier,
     btcOverlayApplied,
+  };
+}
+
+export function applyStructureMultiplier(analysis, structureState) {
+  if (!analysis || typeof analysis !== "object") {
+    return analysis;
+  }
+  const direction = analysis.direction;
+  const stateKey = structureState ?? "unknown";
+
+  if (direction !== "bull" && direction !== "bear") {
+    return {
+      ...analysis,
+      structureState: stateKey,
+      structureMultiplier: 1.0,
+    };
+  }
+
+  const directionKey = direction === "bull" ? "long" : "short";
+  const mult = STRUCTURE_GATING.multipliers[directionKey]?.[stateKey] ?? 1.0;
+
+  const baseScore = isFiniteNumber(analysis.score) ? analysis.score : 0;
+  const newScore = baseScore * mult;
+  const newConfidence = Math.min(Math.abs(newScore), 100);
+
+  return {
+    ...analysis,
+    score: newScore,
+    confidence: newConfidence,
+    structureState: stateKey,
+    structureMultiplier: mult,
   };
 }

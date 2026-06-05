@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTrendState, applyTrendMultiplier, TREND_STATES } from "../js/analysis/trend-gating.js";
+import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, TREND_STATES } from "../js/analysis/trend-gating.js";
 
 function trendCandles(count, mode) {
   const candles = [];
@@ -91,4 +91,43 @@ test("applyTrendMultiplier returns unchanged multiplier for neutral direction", 
   const analysis = { direction: "neutral", score: 0, confidence: 0 };
   const result = applyTrendMultiplier(analysis, TREND_STATES.STRONG_BULL);
   assert.equal(result.trendMultiplier, 1.0);
+});
+
+test("applyStructureMultiplier boosts long signal in bullish structure", () => {
+  const analysis = { direction: "bull", score: 60, confidence: 60 };
+  const result = applyStructureMultiplier(analysis, "bullish_structure");
+  assert.ok(result.score > analysis.score);
+  assert.equal(result.structureMultiplier, 1.05);
+  assert.equal(result.structureState, "bullish_structure");
+});
+
+test("applyStructureMultiplier reduces long signal in bearish structure", () => {
+  const analysis = { direction: "bull", score: 60, confidence: 60 };
+  const result = applyStructureMultiplier(analysis, "bearish_structure");
+  assert.ok(result.score < analysis.score);
+  assert.equal(result.structureMultiplier, 0.95);
+});
+
+test("applyStructureMultiplier reverses for short direction", () => {
+  const analysis = { direction: "bear", score: -60, confidence: 60 };
+  const inBullish = applyStructureMultiplier(analysis, "bullish_structure");
+  const inBearish = applyStructureMultiplier(analysis, "bearish_structure");
+  assert.equal(inBullish.structureMultiplier, 0.95);
+  assert.equal(inBearish.structureMultiplier, 1.05);
+});
+
+test("applyStructureMultiplier returns 1.0 multiplier for mixed/unknown", () => {
+  const analysis = { direction: "bull", score: 60, confidence: 60 };
+  assert.equal(applyStructureMultiplier(analysis, "mixed").structureMultiplier, 1.0);
+  assert.equal(applyStructureMultiplier(analysis, "unknown").structureMultiplier, 1.0);
+  assert.equal(applyStructureMultiplier(analysis, undefined).structureMultiplier, 1.0);
+});
+
+test("applyStructureMultiplier compounds with prior trend multiplication", () => {
+  const baseAnalysis = { direction: "bull", score: 50, confidence: 50 };
+  const afterTrend = applyTrendMultiplier(baseAnalysis, TREND_STATES.STRONG_BULL);
+  const afterStructure = applyStructureMultiplier(afterTrend, "bullish_structure");
+  assert.ok(Math.abs(afterStructure.score - 63.0) < 0.01);
+  assert.equal(afterStructure.trendMultiplier, 1.2);
+  assert.equal(afterStructure.structureMultiplier, 1.05);
 });
