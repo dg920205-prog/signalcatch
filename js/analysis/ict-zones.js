@@ -111,3 +111,140 @@ export function detectSweeps(candles, { swingLookback = ICT_ZONES.swingLookback 
   }
   return sweeps;
 }
+
+function rangesOverlap(aLow, aHigh, bLow, bHigh) {
+  return aLow <= bHigh && bLow <= aHigh;
+}
+
+function isMitigated(candles, activationIndex, bottom, top) {
+  for (let i = activationIndex + 1; i < candles.length; i += 1) {
+    const cc = candles[i];
+    if (!isValidCandle(cc)) continue;
+    if (rangesOverlap(cc.low, cc.high, bottom, top)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function buildIctZones({ candles, atrValue, trendBias = null } = {}) {
+  if (!Array.isArray(candles) || candles.length < 3) return [];
+
+  const fvgs = detectFvgs(candles, { atrValue });
+  const obs = detectOrderBlocks(candles, { atrValue });
+  const sweeps = detectSweeps(candles, {});
+
+  const sweepWindow = Number.isInteger(ICT_ZONES.sweepWindow) ? ICT_ZONES.sweepWindow : 10;
+  const minConfidence = Number.isInteger(ICT_ZONES.minConfidence) ? ICT_ZONES.minConfidence : 3;
+
+  const zones = [];
+
+  function hasPrecedingSweep(type, formationIndex) {
+    return sweeps.some(
+      (s) =>
+        s.type === type &&
+        s.index < formationIndex &&
+        s.index >= formationIndex - sweepWindow,
+    );
+  }
+
+  function scoreZone({ type, sweep, confluence, aligned }) {
+    let score = 1;
+    if (sweep) score += 2;
+    if (confluence) score += 1;
+    if (aligned) score += 1;
+    return score;
+  }
+
+  for (const ob of obs) {
+    const activationIndex = Number.isInteger(ob.fvgIndex) ? ob.fvgIndex : ob.index;
+    const confluence = fvgs.some(
+      (f) => f.type === ob.type && rangesOverlap(ob.bottom, ob.top, f.bottom, f.top),
+    );
+    const sweep = hasPrecedingSweep(ob.type, activationIndex);
+    const aligned =
+      (trendBias === "bull" && ob.type === "bullish") ||
+      (trendBias === "bear" && ob.type === "bearish");
+    const confidence = scoreZone({ type: ob.type, sweep, confluence, aligned });
+    zones.push({
+      kind: confluence ? "bpr" : "ob",
+      type: ob.type,
+      top: ob.top,
+      bottom: ob.bottom,
+      ce: ob.ce,
+      index: ob.index,
+      activationIndex,
+      hasSweep: sweep,
+      hasConfluence: confluence,
+      trendAligned: aligned,
+      confidence,
+      mitigated: isMitigated(candles, activationIndex, ob.bottom, ob.top),
+    });
+  }
+
+  for (const f of fvgs) {
+    const overlapsOb = obs.some(
+      (ob) => ob.type === f.type && rangesOverlap(f.bottom, f.top, ob.bottom, ob.top),
+    );
+    if (overlapsOb) continue;
+    const sweep = hasPrecedingSweep(f.type, f.index);
+    const aligned =
+      (trendBias === "bull" && f.type === "bullish") ||
+      (trendBias === "bear" && f.type === "bearish");
+    const confidence = scoreZone({ type: f.type, sweep, confluence: false, aligned });
+    zones.push({
+      kind: "fvg",
+      type: f.type,
+      top: f.top,
+      bottom: f.bottom,
+      ce: f.ce,
+      index: f.index,
+      activationIndex: f.index,
+      hasSweep: sweep,
+      hasConfluence: false,
+      trendAligned: aligned,
+      confidence,
+      mitigated: isMitigated(candles, f.index, f.bottom, f.top),
+    });
+  }
+
+  return zones;
+}
+
+export function selectEntryZone({
+  zones,
+  direction,
+  referencePrice,
+  minConfidence = ICT_ZONES.minConfidence ?? 3,
+} = {}) {
+  if (!Array.isArray(zones) || zones.length === 0) return null;
+  if (direction !== "bull" && direction !== "bear") return null;
+
+  const wantType = direction === "bull" ? "bullish" : "bearish";
+  const refOk = isFiniteNumber(referencePrice);
+
+  const candidates = zones.filter((z) => {
+    if (z.type !== wantType) return false;
+    if (z.mitigated) return false;
+    if (z.confidence < minConfidence) return false;
+    if (refOk) {
+      if (direction === "bull" && z.top > referencePrice) return false;
+      if (direction === "bear" && z.bottom < referencePrice) return false;
+    }
+    return true;
+  });
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => {
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    if (refOk) {
+      const da = Math.min(Math.abs(referencePrice - a.top), Math.abs(referencePrice - a.bottom));
+      const db = Math.min(Math.abs(referencePrice - b.top), Math.abs(referencePrice - b.bottom));
+      return da - db;
+    }
+    return b.index - a.index;
+  });
+
+  return candidates[0];
+}
