@@ -116,3 +116,9 @@ export const CVD_GATING = Object.freeze({
     }),
   }),
 });
+
+export const ICT_ZONES = Object.freeze({
+  fvgAtrMultiplier: 1.0,
+  swingLookback: 2,
+  obScanWindow: 5,
+});
