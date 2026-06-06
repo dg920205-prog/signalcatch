@@ -11,6 +11,7 @@ import {
   fetchBybitMarketTickers,
   fetchBybitTopSymbols,
   fetchBybitTicker,
+  dropUnclosedCandle,
   normalizeBybitKlines,
   searchBybitSymbols,
 } from "../js/api/bybit.js";
@@ -799,4 +800,21 @@ test("caps Bybit history pagination", async () => {
       );
     },
   );
+});
+
+test("dropUnclosedCandle removes the most recent candle", () => {
+  const candles = [
+    { time: 1, open: 1, high: 2, low: 0.5, close: 1.5, volume: 100 },
+    { time: 2, open: 1.5, high: 2.5, low: 1, close: 2, volume: 100 },
+    { time: 3, open: 2, high: 3, low: 1.5, close: 2.5, volume: 100 },
+  ];
+  const out = dropUnclosedCandle(candles);
+  assert.equal(out.length, 2);
+  assert.equal(out[out.length - 1].time, 2);
+});
+
+test("dropUnclosedCandle returns empty for empty or non-array", () => {
+  assert.deepEqual(dropUnclosedCandle([]), []);
+  assert.deepEqual(dropUnclosedCandle(null), []);
+  assert.deepEqual(dropUnclosedCandle([{ time: 1, open: 1, high: 2, low: 0.5, close: 1.5, volume: 1 }]), []);
 });

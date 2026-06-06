@@ -1,5 +1,5 @@
 import { fetchBinanceCandles, fetchBinanceTicker } from "./api/binance.js";
-import { fetchBybitCandles, fetchBybitHistory, fetchBybitMarketTickers, fetchBybitTicker, fetchBybitTopSymbols, searchBybitSymbols } from "./api/bybit.js";
+import { dropUnclosedCandle, fetchBybitCandles, fetchBybitHistory, fetchBybitMarketTickers, fetchBybitTicker, fetchBybitTopSymbols, searchBybitSymbols } from "./api/bybit.js";
 import { createMarketProfileLoader } from "./analysis/market-profile.js";
 import { buildRecommendation } from "./analysis/recommendation.js";
 import { runBacktest } from "./backtest/engine.js";
@@ -98,6 +98,10 @@ const scannerService = createScannerService({
       fetchBybitCandles(symbol, { interval: MODE_CONFIG[mode].interval, limit: 250, signal }),
     fetchHtfCandles: (symbol, htfInterval, { signal } = {}) =>
       fetchBybitCandles(symbol, { interval: htfInterval, limit: 600, signal }),
+    fetchZoneCandles: async (symbol, zoneInterval, { signal } = {}) =>
+      dropUnclosedCandle(
+        await fetchBybitCandles(symbol, { interval: zoneInterval, limit: 251, signal }),
+      ),
   },
 });
 const marketService = createMarketService({

@@ -921,3 +921,100 @@ test("scanner applies 3-layer compound multiplier (trend × structure × cvd)", 
   assert.ok(Number.isFinite(combined));
   assert.ok(combined > 0, "combined multiplier should be positive");
 });
+
+function zoneCandles() {
+  const c = (o, h, l, cl, v = 100) => ({ open: o, high: h, low: l, close: cl, volume: v });
+  const arr = [];
+  for (let i = 0; i < 30; i += 1) {
+    const base = 200 - i;
+    arr.push(c(base, base + 1, base - 1, base - 0.5, 100));
+  }
+  arr.push(c(170, 171, 160, 161));
+  arr.push(c(161, 162, 158, 159));
+  arr.push(c(159, 160, 150, 151));
+  arr.push(c(151, 155, 151, 154));
+  arr.push(c(154, 158, 153, 157));
+  arr.push(c(157, 159, 145, 156));
+  arr.push(c(158, 158, 154, 155));
+  arr.push(c(155, 173, 155, 172, 800));
+  arr.push(c(172, 176, 168, 174));
+  arr.push(c(174, 180, 172, 178));
+  arr.push(c(178, 184, 176, 182));
+  for (let i = 0; i < 10; i += 1) {
+    const base = 184 + i;
+    arr.push(c(base, base + 1, base - 1, base + 0.5, 100));
+  }
+  return arr;
+}
+
+test("scanner keeps close-based plan when fetchZoneCandles absent", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  assert.equal(candidate.setups.common.ictPlan ?? null, null);
+  assert.ok(candidate.setups.common.plan);
+});
+
+test("scanner produces ICT zone-based plan when fetchZoneCandles provided", async () => {
+  const zc = zoneCandles();
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 190 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+      fetchZoneCandles: async () => zc,
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  const setup = candidate.setups.common;
+  assert.ok(setup.ictPlan, "expected ictPlan present");
+  assert.ok(
+    setup.ictPlan.status === "ready" || setup.ictPlan.status === "waiting",
+    `unexpected status ${setup.ictPlan.status}`,
+  );
+  assert.equal(setup.plan, setup.ictPlan);
+});
+
+test("scanner zone fetch reuses cache across modes with same zoneInterval", async () => {
+  const zoneCalls = [];
+  const zc = zoneCandles();
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "SOLUSDT", price: 190 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+      fetchZoneCandles: async (symbol, zoneInterval) => {
+        zoneCalls.push([symbol, zoneInterval]);
+        return zc;
+      },
+    },
+  });
+  await service.run({ symbols: ["SOL"] });
+  const solZoneCalls = zoneCalls.filter(([s]) => s === "SOL");
+  const uniqueIntervals = new Set(solZoneCalls.map(([, iv]) => iv));
+  assert.equal(uniqueIntervals.size, 3);
+});
+
+test("scanner survives zone fetch failure (plan waiting, scan continues)", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ADAUSDT", price: 0.5 }),
+      fetchCandles: async () => trendingCandles(100, 2),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+      fetchZoneCandles: async () => { throw new Error("zone fetch failed"); },
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ADA"] });
+  assert.equal(candidate.status, "ready");
+  assert.ok(candidate.setups.common.ictPlan);
+  assert.equal(candidate.setups.common.ictPlan.status, "waiting");
+});

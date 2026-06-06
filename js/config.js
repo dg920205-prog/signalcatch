@@ -12,6 +12,8 @@ export const MODE_CONFIG = Object.freeze({
     htfInterval: "240",
     htfLongEmaPeriod: 200,
     htfShortEmaPeriod: 50,
+    zoneInterval: "5",
+    rr: 2,
   }),
   scalp: Object.freeze({
     label: "스캘핑",
@@ -20,6 +22,8 @@ export const MODE_CONFIG = Object.freeze({
     htfInterval: "60",
     htfLongEmaPeriod: 200,
     htfShortEmaPeriod: 50,
+    zoneInterval: "5",
+    rr: 2,
   }),
   day: Object.freeze({
     label: "단타",
@@ -28,6 +32,8 @@ export const MODE_CONFIG = Object.freeze({
     htfInterval: "240",
     htfLongEmaPeriod: 200,
     htfShortEmaPeriod: 50,
+    zoneInterval: "5",
+    rr: 2,
   }),
   daily: Object.freeze({
     label: "데일리",
@@ -36,6 +42,8 @@ export const MODE_CONFIG = Object.freeze({
     htfInterval: "D",
     htfLongEmaPeriod: 200,
     htfShortEmaPeriod: 50,
+    zoneInterval: "60",
+    rr: 3,
   }),
   swing: Object.freeze({
     label: "스윙",
@@ -44,6 +52,8 @@ export const MODE_CONFIG = Object.freeze({
     htfInterval: "D",
     htfLongEmaPeriod: 500,
     htfShortEmaPeriod: 100,
+    zoneInterval: "240",
+    rr: 4,
   }),
 });
 
@@ -123,4 +133,5 @@ export const ICT_ZONES = Object.freeze({
   obScanWindow: 5,
   sweepWindow: 10,
   minConfidence: 3,
+  slAtrBuffer: 0.5,
 });

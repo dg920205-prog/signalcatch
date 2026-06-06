@@ -5,8 +5,17 @@ import { MODE_CONFIG, TREND_GATING } from "../config.js";
 import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, applyCvdMultiplier } from "../analysis/trend-gating.js";
 import { computeStructureState } from "../analysis/structure.js";
 import { computeCvdState } from "../analysis/cvd.js";
+import { buildIctZones, selectEntryZone } from "../analysis/ict-zones.js";
+import { buildIctTradePlan } from "../analysis/trade-plan.js";
+import { atr } from "../analysis/indicators.js";
 
 const MODES = ["common", "scalp", "day", "daily", "swing"];
+
+function deriveTrendBias(trendState) {
+  if (trendState === "strong_bull" || trendState === "weak_bull") return "bull";
+  if (trendState === "strong_bear" || trendState === "weak_bear") return "bear";
+  return null;
+}
 
 function clone(value) {
   return structuredClone(value);
@@ -198,6 +207,7 @@ export function createScannerService({
                 : null;
               const setups = {};
               const htfCache = new Map();
+              const zoneCache = new Map();
               const isBtc = symbol === TREND_GATING.btcSymbol;
               for (const mode of MODES) {
                 const candles = sharedCandles ?? await Promise.resolve().then(() =>
@@ -296,12 +306,67 @@ export function createScannerService({
                   modeResults,
                   mode,
                 });
+                let ictPlan = null;
+                if (
+                  bybit.fetchZoneCandles &&
+                  (finalAnalysis.direction === "bull" || finalAnalysis.direction === "bear")
+                ) {
+                  const zoneInterval = MODE_CONFIG[mode]?.zoneInterval;
+                  if (zoneInterval) {
+                    if (!zoneCache.has(zoneInterval)) {
+                      try {
+                        const zc = await Promise.resolve().then(() =>
+                          bybit.fetchZoneCandles(symbol, zoneInterval, { signal }),
+                        );
+                        zoneCache.set(zoneInterval, zc);
+                      } catch (error) {
+                        if (
+                          safeRead(error, "name") === "AbortError" ||
+                          safeRead(signal, "aborted")
+                        ) {
+                          throw abortError();
+                        }
+                        zoneCache.set(zoneInterval, null);
+                      }
+                    }
+                    const zoneCandles = zoneCache.get(zoneInterval);
+                    if (Array.isArray(zoneCandles) && zoneCandles.length > 0) {
+                      const zoneAtr = atr(zoneCandles, 14);
+                      const trendBias = deriveTrendBias(trendGatingOutput?.state);
+                      const zones = buildIctZones({
+                        candles: zoneCandles,
+                        atrValue: zoneAtr,
+                        trendBias,
+                      });
+                      const referencePrice = safeRead(finalAnalysis, "close");
+                      const entryZone = selectEntryZone({
+                        zones,
+                        direction: finalAnalysis.direction,
+                        referencePrice,
+                      });
+                      ictPlan = buildIctTradePlan({
+                        direction: finalAnalysis.direction,
+                        zone: entryZone,
+                        atr: zoneAtr,
+                        mode,
+                      });
+                    } else {
+                      ictPlan = buildIctTradePlan({
+                        direction: finalAnalysis.direction,
+                        zone: null,
+                        atr: undefined,
+                        mode,
+                      });
+                    }
+                  }
+                }
                 setups[mode] = {
                   mode,
                   direction: finalAnalysis.direction,
                   analysis: finalAnalysis,
-                  plan: recommendation.plan,
+                  plan: bybit.fetchZoneCandles ? ictPlan : recommendation.plan,
                   recommendation,
+                  ictPlan,
                   trendGating: trendGatingOutput,
                   structureGating: structureGatingOutput,
                   cvdGating: cvdGatingOutput,

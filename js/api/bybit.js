@@ -149,6 +149,11 @@ export function normalizeBybitKlines(rows) {
     .sort((left, right) => left.time - right.time);
 }
 
+export function dropUnclosedCandle(candles) {
+  if (!Array.isArray(candles) || candles.length === 0) return [];
+  return candles.slice(0, -1);
+}
+
 export async function fetchBybitTicker(input) {
   const symbol = toUsdtSymbol(input);
   const url = createUrl("/v5/market/tickers", { category: "linear", symbol });

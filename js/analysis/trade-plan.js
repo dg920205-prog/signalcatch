@@ -1,3 +1,5 @@
+import { MODE_CONFIG, ICT_ZONES } from "../config.js";
+
 function isPositiveNumber(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
@@ -100,4 +102,66 @@ export function buildSplitTargets(plan, mode, weights = [0.4, 0.35, 0.25]) {
   });
 
   return { entries, targets };
+}
+
+export function buildIctTradePlan({ direction, zone, atr, mode } = {}) {
+  const waiting = (dir) => ({
+    status: "waiting",
+    direction: dir ?? null,
+    entryLow: null,
+    entryHigh: null,
+    tp: null,
+    sl: null,
+    rr: null,
+    zoneKind: null,
+    confidence: null,
+  });
+
+  if (!["bull", "bear"].includes(direction) || !zone || typeof zone !== "object") {
+    return waiting(direction);
+  }
+
+  const entryLow = zone.bottom;
+  const entryHigh = zone.top;
+  if (!isPositiveNumber(entryLow) || !isPositiveNumber(entryHigh) || entryLow >= entryHigh) {
+    return waiting(direction);
+  }
+
+  const rr = isPositiveNumber(MODE_CONFIG[mode]?.rr) ? MODE_CONFIG[mode].rr : 2;
+  const buffer = isPositiveNumber(atr) ? atr * ICT_ZONES.slAtrBuffer : 0;
+
+  let plan;
+  if (direction === "bull") {
+    const sl = entryLow - buffer;
+    const risk = entryHigh - sl;
+    const tp = entryHigh + risk * rr;
+    plan = {
+      status: "ready",
+      direction,
+      entryLow,
+      entryHigh,
+      tp,
+      sl,
+      rr,
+      zoneKind: zone.kind ?? null,
+      confidence: isPositiveNumber(zone.confidence) ? zone.confidence : null,
+    };
+  } else {
+    const sl = entryHigh + buffer;
+    const risk = sl - entryLow;
+    const tp = entryLow - risk * rr;
+    plan = {
+      status: "ready",
+      direction,
+      entryLow,
+      entryHigh,
+      tp,
+      sl,
+      rr,
+      zoneKind: zone.kind ?? null,
+      confidence: isPositiveNumber(zone.confidence) ? zone.confidence : null,
+    };
+  }
+
+  return isValidPlan(plan) ? plan : waiting(direction);
 }
