@@ -2,9 +2,11 @@ import { analyzeCandles, classifyModes } from "../analysis/signals.js";
 import { buildRecommendation } from "../analysis/recommendation.js";
 import { normalizeBaseSymbol } from "../core/symbols.js";
 import { MODE_CONFIG, TREND_GATING } from "../config.js";
-import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, applyCvdMultiplier } from "../analysis/trend-gating.js";
+import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, applyCvdMultiplier, computeExtensionState, applyExtensionMultiplier } from "../analysis/trend-gating.js";
 import { computeStructureState } from "../analysis/structure.js";
 import { computeCvdState } from "../analysis/cvd.js";
+import { computeStochRsiState, applyStochRsiMultiplier } from "../analysis/stoch-rsi-gating.js";
+import { detectStochRsiDivergence } from "../analysis/stoch-rsi-divergence.js";
 import { buildIctZones, selectEntryZone } from "../analysis/ict-zones.js";
 import { buildIctTradePlan } from "../analysis/trade-plan.js";
 import { atr } from "../analysis/indicators.js";
@@ -218,6 +220,26 @@ export function createScannerService({
                 let trendGatingOutput = null;
                 let structureGatingOutput = null;
                 let cvdGatingOutput = null;
+                let extensionGatingOutput = {
+                  state: "insufficient_data",
+                  multiplier: 1,
+                  ratLong: null,
+                  ratShort: null,
+                };
+                let stochRsiGatingOutput = {
+                  state: "insufficient_data",
+                  multiplier: 1,
+                  k: null,
+                  d: null,
+                };
+                let stochRsiDivergenceOutput = {
+                  state: "insufficient_data",
+                  current: null,
+                  previous: null,
+                  separated: false,
+                  separationReason: null,
+                  confidenceBoost: 0,
+                };
 
                 if (bybit.fetchHtfCandles) {
                   const modeConfig = MODE_CONFIG[mode];
@@ -282,6 +304,19 @@ export function createScannerService({
                         state: cvdResult.state,
                         multiplier: finalAnalysis.cvdMultiplier ?? 1.0,
                       };
+                      const extResult = computeExtensionState({
+                        candles: htfCandles,
+                        longEmaPeriod: modeConfig.htfLongEmaPeriod,
+                        shortEmaPeriod: modeConfig.htfShortEmaPeriod,
+                      });
+                      finalAnalysis = applyExtensionMultiplier(finalAnalysis, extResult);
+                      extensionGatingOutput = {
+                        state: extResult.state,
+                        multiplier:
+                          finalAnalysis?.scoreBreakdown?.extensionMultiplier ?? 1,
+                        ratLong: extResult.ratLong,
+                        ratShort: extResult.ratShort,
+                      };
                     } else {
                       trendGatingOutput = {
                         state: "insufficient_data",
@@ -299,6 +334,16 @@ export function createScannerService({
                     }
                   }
                 }
+
+                const stochRsiResult = computeStochRsiState({ candles });
+                finalAnalysis = applyStochRsiMultiplier(finalAnalysis, stochRsiResult);
+                stochRsiGatingOutput = {
+                  state: stochRsiResult.state,
+                  multiplier:
+                    finalAnalysis?.scoreBreakdown?.stochRsiMultiplier ?? 1,
+                  k: stochRsiResult.k,
+                  d: stochRsiResult.d,
+                };
 
                 const modeResults = signalClassify(finalAnalysis);
                 const recommendation = buildRecommendation({
@@ -344,13 +389,41 @@ export function createScannerService({
                         direction: finalAnalysis.direction,
                         referencePrice,
                       });
+                      const divergence = detectStochRsiDivergence({ candles });
+                      const sameDirection =
+                        (divergence.state === "bullish_hl" && finalAnalysis.direction === "bull") ||
+                        (divergence.state === "bearish_lh" && finalAnalysis.direction === "bear");
+                      const shouldBoost =
+                        sameDirection &&
+                        entryZone &&
+                        Number.isFinite(entryZone.confidence);
+                      const boostedZone = shouldBoost
+                        ? { ...entryZone, confidence: entryZone.confidence + 1 }
+                        : entryZone;
+                      stochRsiDivergenceOutput = {
+                        state: divergence.state,
+                        current: divergence.current,
+                        previous: divergence.previous,
+                        separated: divergence.separated,
+                        separationReason: divergence.separationReason,
+                        confidenceBoost: shouldBoost ? 1 : 0,
+                      };
                       ictPlan = buildIctTradePlan({
                         direction: finalAnalysis.direction,
-                        zone: entryZone,
+                        zone: boostedZone,
                         atr: zoneAtr,
                         mode,
                       });
                     } else {
+                      const divergence = detectStochRsiDivergence({ candles });
+                      stochRsiDivergenceOutput = {
+                        state: divergence.state,
+                        current: divergence.current,
+                        previous: divergence.previous,
+                        separated: divergence.separated,
+                        separationReason: divergence.separationReason,
+                        confidenceBoost: 0,
+                      };
                       ictPlan = buildIctTradePlan({
                         direction: finalAnalysis.direction,
                         zone: null,
@@ -370,6 +443,9 @@ export function createScannerService({
                   trendGating: trendGatingOutput,
                   structureGating: structureGatingOutput,
                   cvdGating: cvdGatingOutput,
+                  extensionGating: extensionGatingOutput,
+                  stochRsiGating: stochRsiGatingOutput,
+                  stochRsiDivergence: stochRsiDivergenceOutput,
                 };
               }
               throwIfAborted(signal);

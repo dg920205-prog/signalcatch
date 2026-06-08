@@ -58,3 +58,57 @@ export function cvdMultiplierText(cvdGating) {
   if (cvdGating.multiplier === 1.0) return null;
   return `CVD ×${cvdGating.multiplier.toFixed(2)}`;
 }
+
+const STOCH_RSI_BADGES = {
+  embedded_ob: "🔋 강세 임베드",
+  embedded_ob_exit: "🪫 강세 임베드 종료",
+  embedded_os: "🔋 약세 임베드",
+  embedded_os_exit: "🪫 약세 임베드 종료",
+  normal: null,
+  insufficient_data: null,
+};
+
+export function stochRsiBadgeText(stochRsiGating) {
+  if (!stochRsiGating || typeof stochRsiGating !== "object") return null;
+  return STOCH_RSI_BADGES[stochRsiGating.state] ?? null;
+}
+
+export function stochRsiMultiplierText(stochRsiGating) {
+  if (!stochRsiGating || typeof stochRsiGating.multiplier !== "number") return null;
+  if (stochRsiGating.multiplier === 1.0) return null;
+  return `StochRSI ×${stochRsiGating.multiplier.toFixed(2)}`;
+}
+
+const STOCH_RSI_DIVERGENCE_BADGES = {
+  bullish_hl: "📈 짝궁둥이",
+  bearish_lh: "📉 짝두",
+};
+
+export function stochRsiDivergenceBadgeText(stochRsiDivergence) {
+  if (!stochRsiDivergence || typeof stochRsiDivergence !== "object") return null;
+  if (stochRsiDivergence.confidenceBoost !== 1) return null;
+  return STOCH_RSI_DIVERGENCE_BADGES[stochRsiDivergence.state] ?? null;
+}
+
+const ICT_ZONE_KIND_LABELS = {
+  bpr: "💎 BPR",
+  ob: "🟦 OB",
+  fvg: "🟧 FVG",
+};
+
+export function ictZoneBadgeText(ictPlan) {
+  if (!ictPlan || typeof ictPlan !== "object") return "";
+  if (ictPlan.status !== "ready") return "";
+  const label = ICT_ZONE_KIND_LABELS[ictPlan.zoneKind] ?? "";
+  if (!label) return "";
+  if (ictPlan.zoneKind !== "bpr") return label;
+  const conf = ictPlan.confidence;
+  return typeof conf === "number" && Number.isFinite(conf)
+    ? `${label} · 신뢰도 ${conf}`
+    : label;
+}
+
+export function ictWaitingText(ictPlan) {
+  if (!ictPlan || typeof ictPlan !== "object") return "";
+  return ictPlan.status === "waiting" ? "⏳ 진입 대기" : "";
+}

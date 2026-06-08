@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, applyCvdMultiplier, TREND_STATES } from "../js/analysis/trend-gating.js";
+import { computeTrendState, applyTrendMultiplier, applyStructureMultiplier, applyCvdMultiplier, computeExtensionState, applyExtensionMultiplier, TREND_STATES } from "../js/analysis/trend-gating.js";
 
 function trendCandles(count, mode) {
   const candles = [];
@@ -163,4 +163,50 @@ test("applyCvdMultiplier compounds with trend x structure multiplication", () =>
   assert.equal(afterCvd.trendMultiplier, 1.2);
   assert.equal(afterCvd.structureMultiplier, 1.05);
   assert.equal(afterCvd.cvdMultiplier, 1.05);
+});
+
+test("computeExtensionState returns insufficient_data for short input", () => {
+  const result = computeExtensionState({ candles: [], longEmaPeriod: 200, shortEmaPeriod: 50 });
+  assert.equal(result.state, "insufficient_data");
+});
+
+test("computeExtensionState detects overextended_up when both ratios exceed thresholds", () => {
+  const candles = [];
+  for (let i = 0; i < 200; i += 1) {
+    candles.push({ open: 1, high: 1.01, low: 0.99, close: 1, volume: 100 });
+  }
+  for (let i = 0; i < 30; i += 1) {
+    const p = 1 + i * 0.02;
+    candles.push({ open: p, high: p + 0.01, low: p - 0.01, close: p, volume: 100 });
+  }
+  const result = computeExtensionState({ candles, longEmaPeriod: 200, shortEmaPeriod: 50 });
+  assert.equal(result.state, "overextended_up", `expected overextended_up, got ${result.state}`);
+});
+
+test("computeExtensionState returns normal when within range", () => {
+  const candles = [];
+  for (let i = 0; i < 230; i += 1) {
+    candles.push({ open: 1, high: 1.01, low: 0.99, close: 1, volume: 100 });
+  }
+  const result = computeExtensionState({ candles, longEmaPeriod: 200, shortEmaPeriod: 50 });
+  assert.equal(result.state, "normal");
+});
+
+test("applyExtensionMultiplier penalizes bull when overextended_up", () => {
+  const analysis = { direction: "bull", score: 80, scoreBreakdown: {} };
+  const out = applyExtensionMultiplier(analysis, { state: "overextended_up" });
+  assert.equal(out.score, 40);
+  assert.equal(out.scoreBreakdown.extensionMultiplier, 0.5);
+});
+
+test("applyExtensionMultiplier does not penalize bear when overextended_up", () => {
+  const analysis = { direction: "bear", score: 80, scoreBreakdown: {} };
+  const out = applyExtensionMultiplier(analysis, { state: "overextended_up" });
+  assert.equal(out.score, 80);
+});
+
+test("applyExtensionMultiplier no-op when normal", () => {
+  const analysis = { direction: "bull", score: 80, scoreBreakdown: {} };
+  const out = applyExtensionMultiplier(analysis, { state: "normal" });
+  assert.equal(out.score, 80);
 });

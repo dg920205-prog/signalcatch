@@ -21,7 +21,7 @@ import { renderScannerResults } from "../js/ui/scanner.js";
 import { renderDashboardContext } from "../js/ui/dashboard-context.js";
 import { tradingViewReferenceUrl } from "../js/ui/tradingview.js";
 import { renderAuxiliary } from "../js/ui/auxiliary.js";
-import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText, cvdBadgeText, cvdMultiplierText } from "../js/ui/trend-badge.js";
+import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText, cvdBadgeText, cvdMultiplierText, ictZoneBadgeText, ictWaitingText, stochRsiBadgeText, stochRsiMultiplierText, stochRsiDivergenceBadgeText } from "../js/ui/trend-badge.js";
 
 const INVALID_BACKTEST_SETTINGS = /잘못된 백테스트 설정입니다\./;
 
@@ -1299,4 +1299,267 @@ test("scanner results show CVD badge when cvdGating present with divergence", ()
   const text = flattenText(container);
   assert.match(text, /↗️ CVD 강세/);
   assert.match(text, /CVD ×1\.05/);
+});
+
+test("stochRsiBadgeText returns exact labels for active embedded states", () => {
+  assert.equal(stochRsiBadgeText({ state: "embedded_ob" }), "🔋 강세 임베드");
+  assert.equal(stochRsiBadgeText({ state: "embedded_ob_exit" }), "🪫 강세 임베드 종료");
+  assert.equal(stochRsiBadgeText({ state: "embedded_os" }), "🔋 약세 임베드");
+  assert.equal(stochRsiBadgeText({ state: "embedded_os_exit" }), "🪫 약세 임베드 종료");
+});
+
+test("stochRsiBadgeText hides inactive or invalid states", () => {
+  assert.equal(stochRsiBadgeText(null), null);
+  assert.equal(stochRsiBadgeText(undefined), null);
+  assert.equal(stochRsiBadgeText({}), null);
+  assert.equal(stochRsiBadgeText({ state: "normal" }), null);
+  assert.equal(stochRsiBadgeText({ state: "insufficient_data" }), null);
+  assert.equal(stochRsiBadgeText({ state: "unknown_state" }), null);
+});
+
+test("stochRsiMultiplierText hides multiplier when 1.0", () => {
+  assert.equal(stochRsiMultiplierText({ multiplier: 1.0 }), null);
+  assert.equal(stochRsiMultiplierText({ multiplier: 0.3 }), "StochRSI ×0.30");
+  assert.equal(stochRsiMultiplierText({ multiplier: 0.9 }), "StochRSI ×0.90");
+  assert.equal(stochRsiMultiplierText(null), null);
+});
+
+test("stochRsiDivergenceBadgeText returns bullish badge only when boost is one", () => {
+  assert.equal(
+    stochRsiDivergenceBadgeText({ state: "bullish_hl", confidenceBoost: 1 }),
+    "📈 짝궁둥이",
+  );
+  assert.equal(stochRsiDivergenceBadgeText({ state: "bullish_hl", confidenceBoost: 0 }), null);
+});
+
+test("stochRsiDivergenceBadgeText returns bearish badge only when boost is one", () => {
+  assert.equal(
+    stochRsiDivergenceBadgeText({ state: "bearish_lh", confidenceBoost: 1 }),
+    "📉 짝두",
+  );
+  assert.equal(stochRsiDivergenceBadgeText({ state: "bearish_lh", confidenceBoost: 0 }), null);
+});
+
+test("stochRsiDivergenceBadgeText hides unsupported or inactive states", () => {
+  assert.equal(stochRsiDivergenceBadgeText(null), null);
+  assert.equal(stochRsiDivergenceBadgeText(undefined), null);
+  assert.equal(stochRsiDivergenceBadgeText({}), null);
+  assert.equal(stochRsiDivergenceBadgeText({ state: "none", confidenceBoost: 1 }), null);
+  assert.equal(stochRsiDivergenceBadgeText({ state: "insufficient_data", confidenceBoost: 1 }), null);
+  assert.equal(stochRsiDivergenceBadgeText({ state: "normal", confidenceBoost: 1 }), null);
+  assert.equal(stochRsiDivergenceBadgeText({ state: "bullish_hl" }), null);
+});
+
+test("scanner setup meta shows StochRSI badge and multiplier", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderScannerResults(
+    container,
+    [{
+      symbol: "ETH",
+      price: 2000,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bear",
+          plan: { entryLow: 1990, entryHigh: 2010, sl: 2050, tp: 1900 },
+          recommendation: { label: "二쇱쓽" },
+          stochRsiGating: { state: "embedded_ob", multiplier: 0.3, k: 88, d: 85 },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.match(text, /🔋 강세 임베드/);
+  assert.match(text, /StochRSI ×0\.30/);
+});
+
+test("scanner result summary shows StochRSI badge but omits multiplier", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderScannerResults(
+    container,
+    [{
+      symbol: "SOL",
+      price: 100,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan: { entryLow: 98, entryHigh: 100, sl: 95, tp: 106 },
+          recommendation: { label: "異붿쿇" },
+          stochRsiGating: { state: "embedded_os_exit", multiplier: 0.9, k: 24, d: 20 },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const [summary] = findNodes(container, (node) => node.attributes.class === "scanner-result-summary");
+  const text = flattenText(summary);
+  assert.match(text, /🪫 약세 임베드 종료/);
+  assert.doesNotMatch(text, /StochRSI ×0\.90/);
+});
+
+test("scanner setup meta shows divergence badge when boost is one", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderScannerResults(
+    container,
+    [{
+      symbol: "ETH",
+      price: 2000,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan: { entryLow: 1990, entryHigh: 2010, sl: 1950, tp: 2100 },
+          recommendation: { label: "추천" },
+          stochRsiDivergence: { state: "bullish_hl", confidenceBoost: 1 },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.match(text, /📈 짝궁둥이/);
+});
+
+test("scanner result summary shows divergence badge when boost is one", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderScannerResults(
+    container,
+    [{
+      symbol: "SOL",
+      price: 100,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bear",
+          plan: { entryLow: 98, entryHigh: 100, sl: 104, tp: 90 },
+          recommendation: { label: "추천" },
+          stochRsiDivergence: { state: "bearish_lh", confidenceBoost: 1 },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const [summary] = findNodes(container, (node) => node.attributes.class === "scanner-result-summary");
+  const text = flattenText(summary);
+  assert.match(text, /📉 짝두/);
+});
+
+test("scanner hides divergence badge when boost is zero", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderScannerResults(
+    container,
+    [{
+      symbol: "XRP",
+      price: 1,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bear",
+          plan: { entryLow: 0.98, entryHigh: 1, sl: 1.04, tp: 0.9 },
+          recommendation: { label: "주의" },
+          stochRsiDivergence: { state: "bullish_hl", confidenceBoost: 0 },
+        },
+      },
+    }],
+    { dom },
+  );
+
+  const text = flattenText(container);
+  assert.doesNotMatch(text, /📈 짝궁둥이/);
+  assert.doesNotMatch(text, /📉 짝두/);
+});
+
+test("ictZoneBadgeText returns BPR label with confidence", () => {
+  assert.equal(ictZoneBadgeText({ status: "ready", zoneKind: "bpr", confidence: 5 }), "💎 BPR · 신뢰도 5");
+});
+
+test("ictZoneBadgeText returns OB label without confidence", () => {
+  assert.equal(ictZoneBadgeText({ status: "ready", zoneKind: "ob", confidence: 3 }), "🟦 OB");
+});
+
+test("ictZoneBadgeText returns FVG label without confidence", () => {
+  assert.equal(ictZoneBadgeText({ status: "ready", zoneKind: "fvg", confidence: 4 }), "🟧 FVG");
+});
+
+test("ictZoneBadgeText safely hides waiting invalid and confidence-less BPR plans", () => {
+  assert.equal(ictZoneBadgeText(null), "");
+  assert.equal(ictZoneBadgeText({}), "");
+  assert.equal(ictZoneBadgeText({ status: "waiting", zoneKind: "bpr", confidence: 5 }), "");
+  assert.equal(ictZoneBadgeText({ status: "ready", zoneKind: "weird", confidence: 5 }), "");
+  assert.equal(ictZoneBadgeText({ status: "ready", zoneKind: "bpr", confidence: null }), "💎 BPR");
+  assert.equal(ictZoneBadgeText({ status: "ready", zoneKind: "bpr" }), "💎 BPR");
+  assert.equal(ictWaitingText(null), "");
+  assert.equal(ictWaitingText({ status: "ready" }), "");
+  assert.equal(ictWaitingText({ status: "waiting" }), "⏳ 진입 대기");
+});
+
+test("scanner results show ICT zone badge when ictPlan ready", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderScannerResults(
+    container,
+    [{
+      symbol: "ETH",
+      price: 2000,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan: { entryLow: 156, entryHigh: 160, sl: 154, tp: 172 },
+          ictPlan: { status: "ready", entryLow: 156, entryHigh: 160, sl: 154, tp: 172, rr: 2, zoneKind: "bpr", confidence: 5 },
+          recommendation: { label: "추천" },
+        },
+      },
+    }],
+    { dom },
+  );
+  const text = flattenText(container);
+  assert.match(text, /💎 BPR · 신뢰도 5/);
+  assert.match(text, /ICT BPR 진입존\(신뢰도 5\)/);
+  assert.match(text, /지정가: 156 ~ 160/);
+  assert.match(text, /SL: 존 하단 − 0\.5×ATR/);
+  assert.match(text, /TP: 모드 RR 2배/);
+});
+
+test("scanner results show 진입 대기 when ictPlan waiting", () => {
+  const dom = createDom(createFakeDocument());
+  const container = new FakeNode("section");
+  renderScannerResults(
+    container,
+    [{
+      symbol: "ADA",
+      price: 0.5,
+      status: "ready",
+      setups: {
+        common: {
+          mode: "common",
+          direction: "bull",
+          plan: { status: "waiting", entryLow: null, entryHigh: null, sl: null, tp: null },
+          ictPlan: { status: "waiting", entryLow: null, entryHigh: null, sl: null, tp: null, rr: null },
+          recommendation: { label: "주의" },
+        },
+      },
+    }],
+    { dom },
+  );
+  const text = flattenText(container);
+  assert.match(text, /⏳ 진입 대기/);
+  assert.match(text, /유효한 ICT 진입존 미발견\. 다음 후보 대기 중\./);
 });

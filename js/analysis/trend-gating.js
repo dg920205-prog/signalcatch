@@ -1,5 +1,5 @@
 import { adx, ema } from "./indicators.js";
-import { TREND_GATING, STRUCTURE_GATING, CVD_GATING } from "../config.js";
+import { TREND_GATING, STRUCTURE_GATING, CVD_GATING, EXTENSION_GATING } from "../config.js";
 
 export const TREND_STATES = Object.freeze({
   STRONG_BULL: "strong_bull",
@@ -177,5 +177,53 @@ export function applyCvdMultiplier(analysis, cvdState) {
     confidence: newConfidence,
     cvdState: stateKey,
     cvdMultiplier: mult,
+  };
+}
+
+export function computeExtensionState({ candles, longEmaPeriod, shortEmaPeriod, gating = EXTENSION_GATING } = {}) {
+  if (!Array.isArray(candles) || candles.length < longEmaPeriod + 1) {
+    return { state: "insufficient_data", ratLong: null, ratShort: null };
+  }
+  const closes = candles.map((c) => (c && Number.isFinite(c.close) ? c.close : null)).filter((v) => v !== null);
+  if (closes.length < longEmaPeriod + 1) {
+    return { state: "insufficient_data", ratLong: null, ratShort: null };
+  }
+  const longSeries = ema(closes, longEmaPeriod);
+  const shortSeries = ema(closes, shortEmaPeriod);
+  const longEma = Array.isArray(longSeries) ? longSeries[longSeries.length - 1] : longSeries;
+  const shortEma = Array.isArray(shortSeries) ? shortSeries[shortSeries.length - 1] : shortSeries;
+  const close = closes[closes.length - 1];
+  if (!Number.isFinite(close) || !Number.isFinite(longEma) || !Number.isFinite(shortEma) || longEma <= 0 || shortEma <= 0) {
+    return { state: "insufficient_data", ratLong: null, ratShort: null };
+  }
+  const ratLong = close / longEma;
+  const ratShort = close / shortEma;
+  const shortHi = gating.shortEmaRatio;
+  const longHi = gating.longEmaRatio;
+  const shortLo = 1 / gating.shortEmaRatio;
+  const longLo = 1 / gating.longEmaRatio;
+  if (ratLong > longHi && ratShort > shortHi) {
+    return { state: "overextended_up", ratLong, ratShort };
+  }
+  if (ratLong < longLo && ratShort < shortLo) {
+    return { state: "overextended_down", ratLong, ratShort };
+  }
+  return { state: "normal", ratLong, ratShort };
+}
+
+export function applyExtensionMultiplier(analysis, extensionState, gating = EXTENSION_GATING) {
+  if (!analysis || typeof analysis !== "object" || !extensionState) return analysis;
+  let multiplier = 1;
+  if (extensionState.state === "overextended_up" && analysis.direction === "bull") {
+    multiplier = gating.penalty;
+  } else if (extensionState.state === "overextended_down" && analysis.direction === "bear") {
+    multiplier = gating.penalty;
+  }
+  if (multiplier === 1) return analysis;
+  const baseScore = Number.isFinite(analysis.score) ? analysis.score : 0;
+  return {
+    ...analysis,
+    score: baseScore * multiplier,
+    scoreBreakdown: { ...(analysis.scoreBreakdown ?? {}), extensionMultiplier: multiplier },
   };
 }

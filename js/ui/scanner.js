@@ -3,7 +3,7 @@ import { formatPrice } from "./format.js";
 import { selectStrongestSetup } from "../analysis/market-heatmap.js";
 import { recommendationBadge } from "./recommendation-badge.js";
 import { MODE_CONFIG } from "../config.js";
-import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText, cvdBadgeText, cvdMultiplierText } from "./trend-badge.js";
+import { trendBadgeText, btcOverlayMark, trendMultiplierText, structureBadgeText, structureMultiplierText, cvdBadgeText, cvdMultiplierText, ictZoneBadgeText, ictWaitingText, stochRsiBadgeText, stochRsiMultiplierText, stochRsiDivergenceBadgeText } from "./trend-badge.js";
 
 const DIRECTION_LABEL = { bull: "상승", bear: "하락", neutral: "중립" };
 const MODES = ["common", "scalp", "day", "daily", "swing"];
@@ -63,12 +63,22 @@ function metricText(label, value, suffix = "") {
 function renderSetupExplanation(setup, plan, dom) {
   const analysis = safeRead(setup, "analysis", {});
   const reasons = snapshotArray(safeRead(analysis, "reasons", []), 3).values;
+  const ictPlan = safeRead(setup, "ictPlan");
+  const ictReady = ictPlan && ictPlan.status === "ready";
+  const ictWaiting = ictPlan && ictPlan.status === "waiting";
+  const entryText = ictReady
+    ? `ICT ${(ictPlan.zoneKind ?? "-").toUpperCase()} 진입존(신뢰도 ${ictPlan.confidence ?? "-"}). 지정가: ${formatPrice(ictPlan.entryLow)} ~ ${formatPrice(ictPlan.entryHigh)}.`
+    : ictWaiting
+    ? "유효한 ICT 진입존 미발견. 다음 후보 대기 중."
+    : "진입: 현재가와 ATR 0.5 구간";
+  const slText = ictReady ? "SL: 존 하단 − 0.5×ATR." : ictWaiting ? "SL: 진입존 확정 후 계산" : "SL: ATR 1.0 방어선";
+  const tpText = ictReady ? `TP: 모드 RR ${ictPlan.rr ?? "-"}배.` : ictWaiting ? "TP: 진입존 확정 후 계산" : "TP: ATR 1.5 목표선";
   return dom.el("div", { class: "setup-explain" },
     dom.el("strong", {}, "산출 기준"),
     dom.el("div", { class: "setup-criteria" },
-      dom.el("span", {}, "진입: 현재가와 ATR 0.5 구간"),
-      dom.el("span", {}, "SL: ATR 1.0 방어선"),
-      dom.el("span", {}, "TP: ATR 1.5 목표선"),
+      dom.el("span", {}, entryText),
+      dom.el("span", {}, slText),
+      dom.el("span", {}, tpText),
       dom.el("span", {}, plan ? `ATR ${formatPrice(safeRead(analysis, "atr"))}` : "ATR -"),
     ),
     dom.el("div", { class: "setup-metrics" },
@@ -126,21 +136,49 @@ function renderSetupDetails(candidate, dom) {
           const mult = cvdMultiplierText(safeRead(setup, "cvdGating"));
           return mult ? dom.el("span", { class: "cvd-multiplier" }, mult) : null;
         })(),
+        (() => {
+          const badge = stochRsiBadgeText(safeRead(setup, "stochRsiGating"));
+          return badge ? dom.el("span", { class: "stoch-rsi-badge" }, badge) : null;
+        })(),
+        (() => {
+          const mult = stochRsiMultiplierText(safeRead(setup, "stochRsiGating"));
+          return mult ? dom.el("span", { class: "stoch-rsi-multiplier" }, mult) : null;
+        })(),
+        (() => {
+          const badge = stochRsiDivergenceBadgeText(safeRead(setup, "stochRsiDivergence"));
+          return badge ? dom.el("span", { class: "stochrsi-divergence-badge" }, badge) : null;
+        })(),
+        (() => {
+          const ict = ictZoneBadgeText(safeRead(setup, "ictPlan"));
+          return ict ? dom.el("span", { class: "ict-zone-badge" }, ict) : null;
+        })(),
       ),
-      dom.el("div", { class: "setup-stat-grid" },
-        dom.el("div", { class: "setup-stat setup-entry" },
-          dom.el("span", {}, "진입"),
-          dom.el("strong", {}, plan ? `${formatPrice(safeRead(plan, "entryLow"))} ~ ${formatPrice(safeRead(plan, "entryHigh"))}` : "-"),
-        ),
-        dom.el("div", { class: "setup-stat setup-sl" },
-          dom.el("span", {}, "SL"),
-          dom.el("strong", {}, plan ? formatPrice(safeRead(plan, "sl")) : "-"),
-        ),
-        dom.el("div", { class: "setup-stat setup-tp" },
-          dom.el("span", {}, "TP"),
-          dom.el("strong", {}, plan ? formatPrice(safeRead(plan, "tp")) : "-"),
-        ),
-      ),
+      (() => {
+        const waiting = ictWaitingText(safeRead(setup, "ictPlan"));
+        const entryStrong = waiting
+          ? dom.el("strong", {}, waiting)
+          : dom.el("strong", {}, plan ? `${formatPrice(safeRead(plan, "entryLow"))} ~ ${formatPrice(safeRead(plan, "entryHigh"))}` : "-");
+        const slStrong = waiting
+          ? dom.el("strong", {}, "-")
+          : dom.el("strong", {}, plan ? formatPrice(safeRead(plan, "sl")) : "-");
+        const tpStrong = waiting
+          ? dom.el("strong", {}, "-")
+          : dom.el("strong", {}, plan ? formatPrice(safeRead(plan, "tp")) : "-");
+        return dom.el("div", { class: "setup-stat-grid" },
+          dom.el("div", { class: "setup-stat setup-entry" },
+            dom.el("span", {}, "진입"),
+            entryStrong,
+          ),
+          dom.el("div", { class: "setup-stat setup-sl" },
+            dom.el("span", {}, "SL"),
+            slStrong,
+          ),
+          dom.el("div", { class: "setup-stat setup-tp" },
+            dom.el("span", {}, "TP"),
+            tpStrong,
+          ),
+        );
+      })(),
       renderSetupExplanation(setup, plan, dom),
       renderSplit(safeRead(recommendation, "split", null), plan, dom),
     );
@@ -195,6 +233,22 @@ export function renderScannerResults(container, candidates = [], { dom, onBackte
         (() => {
           const badge = cvdBadgeText(safeRead(bestSetup, "cvdGating"));
           return badge ? dom.el("span", { class: "cvd-badge" }, badge) : null;
+        })(),
+        (() => {
+          const badge = stochRsiBadgeText(safeRead(bestSetup, "stochRsiGating"));
+          return badge ? dom.el("span", { class: "stoch-rsi-badge" }, badge) : null;
+        })(),
+        (() => {
+          const badge = stochRsiDivergenceBadgeText(safeRead(bestSetup, "stochRsiDivergence"));
+          return badge ? dom.el("span", { class: "stochrsi-divergence-badge" }, badge) : null;
+        })(),
+        (() => {
+          const ict = ictZoneBadgeText(safeRead(bestSetup, "ictPlan"));
+          return ict ? dom.el("span", { class: "ict-zone-badge" }, ict) : null;
+        })(),
+        (() => {
+          const wait = ictWaitingText(safeRead(bestSetup, "ictPlan"));
+          return wait ? dom.el("span", { class: "ict-waiting" }, wait) : null;
         })(),
       ),
       renderSetupDetails(candidate, dom),

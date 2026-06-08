@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { adx } from "../js/analysis/indicators.js";
+import { adx, stochRsi } from "../js/analysis/indicators.js";
 
 function syntheticCandles(count, mode = "uptrend") {
   const candles = [];
@@ -68,4 +68,34 @@ test("adx is bounded between 0 and 100", () => {
     const result = adx(syntheticCandles(100, mode), 14);
     assert.ok(result >= 0 && result <= 100, `ADX out of bounds for ${mode}: ${result}`);
   }
+});
+
+test("stochRsi returns valid k and d for enough data", () => {
+  const closes = [100, 102, 101, 104, 103, 106, 105, 108, 107, 110, 111, 112];
+  const result = stochRsi(closes, 3, 3, 2, 2);
+  assert.equal(typeof result.k, "number");
+  assert.equal(typeof result.d, "number");
+  assert.ok(result.k >= 0 && result.k <= 100);
+  assert.ok(result.d >= 0 && result.d <= 100);
+  assert.equal(result.kSeries.length, closes.length);
+  assert.equal(result.dSeries.length, closes.length);
+});
+
+test("stochRsi returns null for insufficient data", () => {
+  assert.equal(stochRsi([1, 2, 3], 14, 14, 3, 3), null);
+});
+
+test("stochRsi handles flat RSI windows without NaN", () => {
+  const closes = Array.from({ length: 12 }, () => 100);
+  const result = stochRsi(closes, 3, 3, 2, 2);
+  assert.equal(result.k, 50);
+  assert.equal(result.d, 50);
+  assert.ok(result.kSeries.filter(Number.isFinite).every((value) => value === 50));
+});
+
+test("stochRsi returns expected values for a known sequence", () => {
+  const closes = [100, 102, 101, 104, 103, 106, 105, 108, 107, 110, 111, 112];
+  const result = stochRsi(closes, 3, 3, 2, 2);
+  assert.ok(Math.abs(result.k - 100) <= 0.5, `expected K near 100, got ${result.k}`);
+  assert.ok(Math.abs(result.d - 99.75) <= 0.5, `expected D near 99.75, got ${result.d}`);
 });

@@ -271,3 +271,110 @@ export function adx(candles, period = 14) {
 
   return result;
 }
+
+function rsiSeries(values, period) {
+  if (
+    !hasNumbers(values) ||
+    !isValidPeriod(period) ||
+    values.length < period + 1
+  ) {
+    return null;
+  }
+
+  const series = Array(values.length).fill(null);
+  let totalGain = 0;
+  let totalLoss = 0;
+
+  for (let index = 1; index <= period; index += 1) {
+    const change = values[index] - values[index - 1];
+    if (!isFiniteNumber(change)) {
+      return null;
+    }
+    totalGain += Math.max(change, 0);
+    totalLoss += Math.max(-change, 0);
+  }
+
+  let averageGain = totalGain / period;
+  let averageLoss = totalLoss / period;
+
+  const toRsi = (gain, loss) => {
+    if (!isFiniteNumber(gain) || !isFiniteNumber(loss)) return null;
+    if (loss === 0) return gain === 0 ? 50 : 100;
+    return finiteOrNull(100 - 100 / (1 + gain / loss));
+  };
+
+  series[period] = toRsi(averageGain, averageLoss);
+  if (!isFiniteNumber(series[period])) {
+    return null;
+  }
+
+  for (let index = period + 1; index < values.length; index += 1) {
+    const change = values[index] - values[index - 1];
+    if (!isFiniteNumber(change)) {
+      return null;
+    }
+    averageGain = (averageGain * (period - 1) + Math.max(change, 0)) / period;
+    averageLoss = (averageLoss * (period - 1) + Math.max(-change, 0)) / period;
+    series[index] = toRsi(averageGain, averageLoss);
+    if (!isFiniteNumber(series[index])) {
+      return null;
+    }
+  }
+
+  return series;
+}
+
+function smaSeries(values, period) {
+  if (!Array.isArray(values) || !isValidPeriod(period)) {
+    return null;
+  }
+
+  return values.map((_, index) => {
+    if (index < period - 1) return null;
+    const window = values.slice(index - period + 1, index + 1);
+    if (!window.every(isFiniteNumber)) return null;
+    return finiteOrNull(window.reduce((sum, value) => sum + value, 0) / period);
+  });
+}
+
+export function stochRsi(closes, rsiPeriod = 14, stochPeriod = 14, kSmooth = 3, dSmooth = 3) {
+  if (
+    !hasNumbers(closes) ||
+    !isValidPeriod(rsiPeriod) ||
+    !isValidPeriod(stochPeriod) ||
+    !isValidPeriod(kSmooth) ||
+    !isValidPeriod(dSmooth) ||
+    closes.length < rsiPeriod + stochPeriod + kSmooth + dSmooth
+  ) {
+    return null;
+  }
+
+  const rsiValues = rsiSeries(closes, rsiPeriod);
+  if (!rsiValues) return null;
+
+  const rawStoch = Array(closes.length).fill(null);
+  for (let index = rsiPeriod + stochPeriod - 1; index < rsiValues.length; index += 1) {
+    const window = rsiValues.slice(index - stochPeriod + 1, index + 1);
+    if (!window.every(isFiniteNumber)) continue;
+    const min = Math.min(...window);
+    const max = Math.max(...window);
+    rawStoch[index] = max - min === 0
+      ? 50
+      : finiteOrNull(((rsiValues[index] - min) / (max - min)) * 100);
+    if (!isFiniteNumber(rawStoch[index])) {
+      return null;
+    }
+  }
+
+  const kSeries = smaSeries(rawStoch, kSmooth);
+  const dSeries = smaSeries(kSeries, dSmooth);
+  if (!kSeries || !dSeries) return null;
+
+  const k = kSeries.at(-1);
+  const d = dSeries.at(-1);
+  if (!isFiniteNumber(k) || !isFiniteNumber(d)) {
+    return null;
+  }
+
+  return { k, d, kSeries, dSeries };
+}

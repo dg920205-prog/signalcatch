@@ -127,6 +127,25 @@ export const CVD_GATING = Object.freeze({
   }),
 });
 
+export const EXTENSION_GATING = Object.freeze({
+  shortEmaRatio: 1.25,
+  longEmaRatio: 1.40,
+  penalty: 0.5,
+});
+
+export const STOCHRSI_GATING = Object.freeze({
+  rsiPeriod: 14,
+  stochPeriod: 14,
+  kSmooth: 3,
+  dSmooth: 3,
+  obThreshold: 80,
+  osThreshold: 20,
+  embeddedWindow: 5,
+  embeddedMinCount: 4,
+  embeddedPenalty: 0.3,
+  exitMultiplier: 0.9,
+});
+
 export const ICT_ZONES = Object.freeze({
   fvgAtrMultiplier: 1.0,
   swingLookback: 2,

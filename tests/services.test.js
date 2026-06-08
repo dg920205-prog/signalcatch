@@ -24,6 +24,30 @@ function trendingCandles(start, step) {
   );
 }
 
+function stochRsiModeCandles(start, step) {
+  return Array.from({ length: 80 }, (_, index) =>
+    candle(start + step * index, 100 + index * 5),
+  );
+}
+
+function stochRsiEmbeddedObCandles() {
+  return [
+    ...stochRsiModeCandles(100, 1),
+    ...[180, 182, 181, 184, 183, 186, 185, 188, 187, 190, 191, 192].map((close) =>
+      candle(close, 500),
+    ),
+  ];
+}
+
+function stochRsiEmbeddedOsCandles() {
+  return [
+    ...stochRsiModeCandles(200, -1),
+    ...[120, 118, 119, 116, 117, 114, 115, 112, 113, 110, 109, 108].map((close) =>
+      candle(close, 500),
+    ),
+  ];
+}
+
 function deferred() {
   let resolve;
   let reject;
@@ -947,6 +971,84 @@ function zoneCandles() {
   return arr;
 }
 
+function bearishZoneCandles() {
+  const c = (o, h, l, cl, v = 100) => ({ open: o, high: h, low: l, close: cl, volume: v });
+  const arr = [];
+  for (let i = 0; i < 30; i += 1) {
+    const base = 100 + i;
+    arr.push(c(base, base + 1, base - 1, base + 0.5, 100));
+  }
+  arr.push(c(130, 140, 129, 139));
+  arr.push(c(139, 142, 138, 141));
+  arr.push(c(141, 150, 140, 149));
+  arr.push(c(149, 149, 137, 140));
+  arr.push(c(140, 141, 132, 133));
+  arr.push(c(96, 98, 94, 97));
+  arr.push(c(97, 97, 82, 84, 800));
+  arr.push(c(84, 92, 80, 82));
+  arr.push(c(82, 90, 78, 80));
+  arr.push(c(80, 88, 76, 78));
+  return arr;
+}
+
+const BULLISH_HL_DIVERGENCE_CLOSES = [
+  99.89, 100, 99.96, 99.95, 100.08, 99.98, 100, 100.05, 100.02, 99.83,
+  99.67, 99.48, 99.43, 99.52, 99.39, 99.41, 99.45, 99.3, 99.42, 99.32,
+  99.22, 99.06, 99.2, 99.04, 99.03, 99.06, 98.89, 98.92, 98.89, 99.02,
+  98.98, 99.04, 98.97, 99.09, 98.98, 98.98, 99.16, 99.23, 99.41, 99.44,
+  99.36, 99.52, 99.41, 99.62, 99.73, 99.8, 99.92, 99.88, 100.05, 100.06,
+  100, 100.07, 99.99, 100.14, 100.01, 100, 99.85, 99.78, 99.86, 99.83,
+  99.93, 99.8, 99.82, 99.82, 99.71, 99.84, 99.94, 99.99, 100.03, 100.13,
+  99.96, 100.11, 100, 99.93, 99.8, 99.84, 100.04, 99.95, 99.94, 99.95,
+  99.95, 100.11, 100.16, 100.12, 100.07, 100.21, 100.32, 100.19, 100.22,
+  100.21, 100.16, 100.36, 100.45, 100.32, 100.48, 100.51, 100.55, 100.68,
+  100.84, 100.75,
+];
+
+const BEARISH_LH_DIVERGENCE_CLOSES = [
+  99.82, 99.74, 99.63, 99.76, 99.75, 99.55, 99.69, 99.7, 99.59, 99.59,
+  99.54, 99.56, 99.53, 99.5, 99.4, 99.21, 99.01, 99.01, 99.08, 98.98,
+  98.92, 99, 98.82, 98.78, 98.92, 99.05, 99.16, 99.08, 99.22, 99.21,
+  99.39, 99.56, 99.69, 99.66, 99.57, 99.46, 99.59, 99.8, 99.83, 99.75,
+  99.82, 100.02, 100.1, 100.09, 100.09, 100.28, 100.48, 100.39, 100.27,
+  100.46, 100.38, 100.36, 100.47, 100.42, 100.53, 100.35, 100.34, 100.42,
+  100.48, 100.42, 100.43, 100.5, 100.43, 100.39, 100.43, 100.52, 100.67,
+  100.74, 100.78, 100.91, 101.05, 100.93, 100.81, 100.62, 100.61, 100.7,
+  100.84, 101.01, 101.21, 101.2, 101.06, 101.05, 101.22, 101.1, 101.18,
+  101.07, 101.24, 101.17, 101.33, 101.53, 101.53, 101.41, 101.35, 101.5,
+  101.6, 101.52, 101.39, 101.33, 101.19, 101.27,
+];
+
+function divergenceCandles(closes) {
+  return closes.map((close) => candle(close, 100));
+}
+
+async function scanWithDivergence({
+  modeCandles,
+  zoneCandleSet,
+  direction,
+  close,
+  htfDirection,
+}) {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "TESTUSDT", price: close }),
+      fetchCandles: async () => modeCandles,
+      fetchModeCandles: async () => modeCandles,
+      fetchHtfCandles: async () => htfTrendingCandles(htfDirection, 600),
+      fetchZoneCandles: async () => zoneCandleSet,
+    },
+    analyze: () => ({
+      direction,
+      score: 80,
+      close,
+      scoreBreakdown: {},
+    }),
+  });
+  const [candidate] = await service.run({ symbols: ["TEST"] });
+  return candidate.setups.common;
+}
+
 test("scanner keeps close-based plan when fetchZoneCandles absent", async () => {
   const service = createScannerService({
     bybit: {
@@ -1017,4 +1119,251 @@ test("scanner survives zone fetch failure (plan waiting, scan continues)", async
   assert.equal(candidate.status, "ready");
   assert.ok(candidate.setups.common.ictPlan);
   assert.equal(candidate.setups.common.ictPlan.status, "waiting");
+});
+
+test("scanner sets extensionGating to insufficient_data when fetchHtfCandles not provided", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  assert.equal(candidate.setups.common.extensionGating.state, "insufficient_data");
+  assert.equal(candidate.setups.common.extensionGating.multiplier, 1);
+});
+
+test("scanner populates extensionGating when fetchHtfCandles provided", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "SOLUSDT", price: 100 }),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+      fetchHtfCandles: async () => htfTrendingCandles("up", 600),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["SOL"] });
+  assert.ok(["normal", "overextended_up", "overextended_down", "insufficient_data"].includes(candidate.setups.common.extensionGating.state));
+});
+
+test("scanner populates stochRsiGating with mode candles only", async () => {
+  let htfCalls = 0;
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ETHUSDT", price: 2000 }),
+      fetchModeCandles: async () => stochRsiModeCandles(100, 2),
+      fetchHtfCandles: async () => {
+        htfCalls += 1;
+        return htfTrendingCandles("up", 600);
+      },
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["ETH"] });
+  const gating = candidate.setups.common.stochRsiGating;
+  assert.ok(gating);
+  assert.ok(["normal", "embedded_ob", "embedded_os", "embedded_ob_exit", "embedded_os_exit", "insufficient_data"].includes(gating.state));
+  assert.equal(typeof gating.multiplier, "number");
+  assert.ok(htfCalls > 0, "HTF fetch still belongs to existing gates, not StochRSI");
+});
+
+test("scanner sets stochRsiGating insufficient_data when mode candles are too short", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "XRPUSDT", price: 1 }),
+      fetchModeCandles: async () => trendingCandles(100, 2),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["XRP"] });
+  assert.equal(candidate.setups.common.stochRsiGating.state, "insufficient_data");
+  assert.equal(candidate.setups.common.stochRsiGating.multiplier, 1);
+});
+
+test("scanner applies 0.3 StochRSI penalty when embedded_ob and direction bear", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "ADAUSDT", price: 100 }),
+      fetchModeCandles: async () => stochRsiEmbeddedOsCandles(),
+    },
+    analyze: (candles) => ({
+      direction: "bear",
+      score: 80,
+      close: candles.at(-1)?.close ?? null,
+      scoreBreakdown: {},
+    }),
+  });
+  const [candidate] = await service.run({ symbols: ["ADA"] });
+  const gating = candidate.setups.common.stochRsiGating;
+  if (gating.state === "embedded_ob") {
+    assert.equal(gating.multiplier, 0.3);
+    assert.equal(candidate.setups.common.analysis.score, 24);
+  } else {
+    assert.ok(["normal", "embedded_ob_exit", "insufficient_data"].includes(gating.state));
+    assert.ok([1, 0.9].includes(gating.multiplier));
+  }
+});
+
+test("scanner applies 0.3 StochRSI penalty when embedded_os and direction bull", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "SOLUSDT", price: 100 }),
+      fetchModeCandles: async () => stochRsiEmbeddedObCandles(),
+    },
+    analyze: (candles) => ({
+      direction: "bull",
+      score: 80,
+      close: candles.at(-1)?.close ?? null,
+      scoreBreakdown: {},
+    }),
+  });
+  const [candidate] = await service.run({ symbols: ["SOL"] });
+  const gating = candidate.setups.common.stochRsiGating;
+  if (gating.state === "embedded_os") {
+    assert.equal(gating.multiplier, 0.3);
+    assert.equal(candidate.setups.common.analysis.score, 24);
+  } else {
+    assert.ok(["normal", "embedded_os_exit", "insufficient_data"].includes(gating.state));
+    assert.ok([1, 0.9].includes(gating.multiplier));
+  }
+});
+
+test("scanner keeps same-direction embedded StochRSI signals at 1.0", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "LINKUSDT", price: 100 }),
+      fetchModeCandles: async () => stochRsiEmbeddedOsCandles(),
+    },
+    analyze: (candles) => ({
+      direction: "bull",
+      score: 80,
+      close: candles.at(-1)?.close ?? null,
+      scoreBreakdown: {},
+    }),
+  });
+  const [candidate] = await service.run({ symbols: ["LINK"] });
+  const gating = candidate.setups.common.stochRsiGating;
+  if (gating.state === "embedded_ob") {
+    assert.equal(gating.multiplier, 1);
+    assert.equal(candidate.setups.common.analysis.score, 80);
+  } else {
+    assert.ok(["normal", "embedded_ob_exit", "insufficient_data"].includes(gating.state));
+    assert.ok([1, 0.9].includes(gating.multiplier));
+  }
+});
+
+test("scanner adds stochRsiGating to every mode", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "HBARUSDT", price: 1 }),
+      fetchModeCandles: async () => stochRsiModeCandles(100, 2),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["HBAR"] });
+  for (const mode of MODES) {
+    const gating = candidate.setups[mode].stochRsiGating;
+    assert.ok(gating, `${mode} stochRsiGating missing`);
+    assert.equal(typeof gating.state, "string");
+    assert.equal(typeof gating.multiplier, "number");
+  }
+});
+
+test("scanner exposes stochRsiDivergence field on every mode", async () => {
+  const service = createScannerService({
+    bybit: {
+      fetchTicker: async () => ({ symbol: "HBARUSDT", price: 1 }),
+      fetchModeCandles: async () => divergenceCandles(BULLISH_HL_DIVERGENCE_CLOSES),
+    },
+  });
+  const [candidate] = await service.run({ symbols: ["HBAR"] });
+  for (const mode of MODES) {
+    const divergence = candidate.setups[mode].stochRsiDivergence;
+    assert.ok(divergence, `${mode} stochRsiDivergence missing`);
+    assert.equal(typeof divergence.state, "string");
+    assert.equal(typeof divergence.separated, "boolean");
+    assert.equal(typeof divergence.confidenceBoost, "number");
+  }
+});
+
+test("scanner exposes divergence without boost when zone candles are empty", async () => {
+  const setup = await scanWithDivergence({
+    modeCandles: divergenceCandles(BULLISH_HL_DIVERGENCE_CLOSES),
+    zoneCandleSet: [],
+    direction: "bull",
+    close: 190,
+    htfDirection: "up",
+  });
+  assert.equal(setup.stochRsiDivergence.state, "bullish_hl");
+  assert.equal(setup.stochRsiDivergence.confidenceBoost, 0);
+  assert.equal(setup.ictPlan.status, "waiting");
+});
+
+test("scanner boosts same-direction bullish divergence by exactly one confidence point", async () => {
+  const base = await scanWithDivergence({
+    modeCandles: stochRsiModeCandles(100, 2),
+    zoneCandleSet: zoneCandles(),
+    direction: "bull",
+    close: 190,
+    htfDirection: "up",
+  });
+  const boosted = await scanWithDivergence({
+    modeCandles: divergenceCandles(BULLISH_HL_DIVERGENCE_CLOSES),
+    zoneCandleSet: zoneCandles(),
+    direction: "bull",
+    close: 190,
+    htfDirection: "up",
+  });
+  assert.equal(boosted.stochRsiDivergence.state, "bullish_hl");
+  assert.equal(boosted.stochRsiDivergence.confidenceBoost, 1);
+  assert.equal(boosted.ictPlan.confidence, base.ictPlan.confidence + 1);
+});
+
+test("scanner boosts same-direction bearish divergence by exactly one confidence point", async () => {
+  const base = await scanWithDivergence({
+    modeCandles: stochRsiModeCandles(200, -2),
+    zoneCandleSet: bearishZoneCandles(),
+    direction: "bear",
+    close: 90,
+    htfDirection: "down",
+  });
+  const boosted = await scanWithDivergence({
+    modeCandles: divergenceCandles(BEARISH_LH_DIVERGENCE_CLOSES),
+    zoneCandleSet: bearishZoneCandles(),
+    direction: "bear",
+    close: 90,
+    htfDirection: "down",
+  });
+  assert.equal(boosted.stochRsiDivergence.state, "bearish_lh");
+  assert.equal(boosted.stochRsiDivergence.confidenceBoost, 1);
+  assert.equal(boosted.ictPlan.confidence, base.ictPlan.confidence + 1);
+});
+
+test("scanner does not boost opposite-direction divergence", async () => {
+  const base = await scanWithDivergence({
+    modeCandles: stochRsiModeCandles(200, -2),
+    zoneCandleSet: bearishZoneCandles(),
+    direction: "bear",
+    close: 90,
+    htfDirection: "down",
+  });
+  const opposite = await scanWithDivergence({
+    modeCandles: divergenceCandles(BULLISH_HL_DIVERGENCE_CLOSES),
+    zoneCandleSet: bearishZoneCandles(),
+    direction: "bear",
+    close: 90,
+    htfDirection: "down",
+  });
+  assert.equal(opposite.stochRsiDivergence.state, "bullish_hl");
+  assert.equal(opposite.stochRsiDivergence.confidenceBoost, 0);
+  assert.equal(opposite.ictPlan.confidence, base.ictPlan.confidence);
+});
+
+test("scanner does not boost when entry zone is not selected", async () => {
+  const setup = await scanWithDivergence({
+    modeCandles: divergenceCandles(BEARISH_LH_DIVERGENCE_CLOSES),
+    zoneCandleSet: zoneCandles(),
+    direction: "bear",
+    close: 190,
+    htfDirection: "down",
+  });
+  assert.equal(setup.stochRsiDivergence.state, "bearish_lh");
+  assert.equal(setup.stochRsiDivergence.confidenceBoost, 0);
+  assert.equal(setup.ictPlan.status, "waiting");
 });
